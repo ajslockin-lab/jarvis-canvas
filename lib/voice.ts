@@ -1,17 +1,4 @@
-// Wispr AI + Web Speech API wrappers
-
-/**
- * Initialize Wispr AI (if available) or Web Speech API for speech-to-text.
- * Falls back to Web Speech API if Wispr is not loaded.
- */
-export function createWisprRecognizer(): any {
-  // Check if Wispr is available globally
-  const wispr = (window as any).Wispr?.SpeechRecognizer;
-  if (wispr) {
-    return new wispr();
-  }
-  return null;
-}
+// Web Speech API wrappers
 
 /**
  * Create a Web Speech API recognition instance.
