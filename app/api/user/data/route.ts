@@ -1,10 +1,15 @@
 import { NextResponse } from "next/server";
+import { requireAuth } from "@/lib/with-auth";
+import { apiError } from "@/lib/errors";
 import { prisma } from "@/lib/prisma";
 
 export async function GET() {
   try {
-    // Get the first user (for personal token setup)
-    const user = await prisma.user.findFirst({
+    const { user, error: authError } = await requireAuth();
+    if (authError) return authError;
+
+    const fullUser = await prisma.user.findUnique({
+      where: { id: user.id },
       include: {
         courses: {
           include: {
@@ -21,20 +26,17 @@ export async function GET() {
       },
     });
 
-    if (!user) {
+    if (!fullUser) {
       return NextResponse.json({ courses: [], hasData: false });
     }
 
     return NextResponse.json({
-      user,
-      courses: user.courses,
+      user: fullUser,
+      courses: fullUser.courses,
       hasData: true,
     });
   } catch (error) {
     console.error("Error fetching user data:", error);
-    return NextResponse.json(
-      { error: "Failed to fetch user data" },
-      { status: 500 }
-    );
+    return apiError("INTERNAL");
   }
 }

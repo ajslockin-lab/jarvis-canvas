@@ -1,4 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
+import { requireAuth } from "@/lib/with-auth";
+import { apiError } from "@/lib/errors";
+import { extensionAgentSchema } from "@/lib/validators";
 
 interface PageElement {
   id: string;
@@ -192,14 +195,18 @@ function planAction(command: string, context: PageContext): AgentPlan {
 
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json();
-    const command = typeof body.command === "string" ? body.command : "";
-    const pageContext = body.pageContext as PageContext | undefined;
+    const { error: authError } = await requireAuth();
+    if (authError) return authError;
 
-    if (!command || !pageContext || !Array.isArray(pageContext.elements)) {
-      return NextResponse.json({ error: "Missing command or page context" }, { status: 400 });
+    const body = await req.json();
+    const parsed = extensionAgentSchema.safeParse(body);
+    if (!parsed.success) {
+      return apiError("VALIDATION", {
+        error: parsed.error.issues.map((i) => i.message).join(", "),
+      });
     }
 
+    const { command, pageContext } = parsed.data;
     return NextResponse.json(planAction(command, pageContext));
   } catch (error) {
     console.error("Extension agent error:", error);

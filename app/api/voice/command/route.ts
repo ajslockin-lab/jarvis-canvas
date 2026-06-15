@@ -1,26 +1,24 @@
 import { NextRequest, NextResponse } from "next/server";
 import { classifyIntent, generateResponse } from "@/lib/nlu";
 import { prisma } from "@/lib/prisma";
+import { requireAuth } from "@/lib/with-auth";
+import { apiError } from "@/lib/errors";
+import { voiceCommandSchema } from "@/lib/validators";
 
 export async function POST(req: NextRequest) {
   try {
-    const { text } = await req.json();
-    if (!text || typeof text !== "string") {
-      return NextResponse.json({ error: "Missing text" }, { status: 400 });
-    }
+    const { user, error: authError } = await requireAuth();
+    if (authError) return authError;
 
-    // Get user context (first user for now, or create one)
-    let user = await prisma.user.findFirst({});
-    if (!user) {
-      user = await prisma.user.create({
-        data: {
-          email: "student@gavirtual.instructure.com",
-          name: "GAVS Student",
-          canvasToken: process.env.CANVAS_PERSONAL_TOKEN || "",
-          canvasDomain: process.env.CANVAS_DOMAIN || "",
-        },
+    const body = await req.json();
+    const parsed = voiceCommandSchema.safeParse(body);
+    if (!parsed.success) {
+      return apiError("VALIDATION", {
+        error: parsed.error.issues.map((i) => i.message).join(", "),
       });
     }
+
+    const { text } = parsed.data;
 
     const userData = await prisma.user.findUnique({
       where: { id: user.id },
@@ -47,30 +45,15 @@ export async function POST(req: NextRequest) {
       context.reminders = userData.reminders;
     }
 
-    // NLU: classify intent
     const nlu = await classifyIntent(text);
-
-    // Generate response based on intent
     const response = await generateResponse(nlu.intent, nlu.entities, context);
 
-    // Save conversation
-    if (user) {
-      await prisma.conversation.create({
-        data: {
-          userId: user.id,
-          role: "user",
-          message: text,
-          intent: nlu.intent,
-        },
-      });
-      await prisma.conversation.create({
-        data: {
-          userId: user.id,
-          role: "assistant",
-          message: response,
-        },
-      });
-    }
+    await prisma.conversation.create({
+      data: { userId: user.id, role: "user", message: text, intent: nlu.intent },
+    });
+    await prisma.conversation.create({
+      data: { userId: user.id, role: "assistant", message: response },
+    });
 
     return NextResponse.json({
       intent: nlu.intent,
@@ -79,9 +62,6 @@ export async function POST(req: NextRequest) {
     });
   } catch (error) {
     console.error("Voice command error:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+    return apiError("INTERNAL");
   }
 }
