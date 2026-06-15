@@ -8,17 +8,25 @@ datasource db {
 }
 
 model User {
-  id                String   @id @default(uuid())
-  email             String   @unique
-  name              String?
-  image             String?
-  canvasToken       String?
-  canvasDomain      String?
-  ttsEnabled        Boolean  @default(true)
-  proactiveAlerts   Boolean  @default(true)
-  energyLevel       Int      @default(3)
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  id                            String    @id @default(uuid())
+  email                         String    @unique
+  name                          String?
+  image                         String?
+  // Canvas OAuth — encrypted at rest
+  canvasBaseUrl                 String?
+  canvasAccessTokenEncrypted    String?
+  canvasRefreshTokenEncrypted   String?
+  canvasTokenExpiresAt          DateTime?
+  canvasUserId                  String?
+  // Legacy fields — keep for migration compatibility
+  canvasToken                   String?
+  canvasDomain                  String?
+  // User preferences
+  ttsEnabled                    Boolean   @default(true)
+  proactiveAlerts               Boolean   @default(true)
+  energyLevel                   Int       @default(3)
+  createdAt                     DateTime  @default(now())
+  updatedAt                     DateTime  @updatedAt
 
   courses       Course[]
   reminders     Reminder[]
