@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Volume2,
   VolumeX,
@@ -22,6 +22,14 @@ export default function SettingsPage() {
   const [energyLevel, setEnergyLevel] = useState(3);
   const [syncing, setSyncing] = useState(false);
   const [syncResult, setSyncResult] = useState<string | null>(null);
+  const [canvasConnected, setCanvasConnected] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/user/data")
+      .then((r) => r.json())
+      .then((data) => setCanvasConnected(!!data.user?.canvasBaseUrl))
+      .catch(() => setCanvasConnected(false));
+  }, []);
 
   const handleSync = async () => {
     setSyncing(true);
@@ -75,7 +83,12 @@ export default function SettingsPage() {
             <p className="font-rajdhani text-[13px] text-[#5a7a8a]">
               Connect your Canvas account to sync courses, assignments, and grades.
             </p>
-            <CanvasConnectButton />
+            <CanvasConnectButton connected={canvasConnected} />
+            {canvasConnected && (
+              <p className="font-mono-data text-[11px] text-[#00FF88]">
+                ✓ Canvas connected
+              </p>
+            )}
           </div>
         </SettingsSection>
 
