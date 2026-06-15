@@ -15,19 +15,11 @@ export interface AuthedUser {
   canvasUserId: string | null;
 }
 
-interface AuthResult {
-  user: AuthedUser;
-  error: null;
-} | {
-  user: null;
-  error: NextResponse;
-}
-
 /**
  * Validates the NextAuth session and loads the full user record.
  * Returns { user, error } — if error is non-null, return it from the route handler.
  */
-export async function requireAuth(): Promise<AuthResult> {
+export async function requireAuth(): Promise<{ user: AuthedUser; error: null } | { user: null; error: NextResponse }> {
   const session = await getServerSession(authOptions);
   if (!session?.user?.email) {
     return { user: null, error: apiError("UNAUTHORIZED") };
@@ -63,7 +55,6 @@ export async function getCanvasToken(user: AuthedUser): Promise<string | null> {
     return null;
   }
 
-  // Check if token is expired and try refresh
   if (user.canvasTokenExpiresAt && new Date() > user.canvasTokenExpiresAt) {
     const { refreshCanvasToken } = await import("./canvas-auth");
     const newToken = await refreshCanvasToken(user.id);

@@ -18,7 +18,13 @@ interface Course {
 }
 
 export default function ExtensionOverlay() {
-  const [pos, setPos] = useState({ x: 0, y: 0 });
+  // Compute initial position outside effect to avoid cascading renders
+  const [pos, setPos] = useState(() => {
+    if (typeof window === "undefined") return { x: 0, y: 0 };
+    const w = window.innerWidth;
+    const h = window.innerHeight;
+    return { x: w - 420 - 16, y: h / 2 - 320 };
+  });
   const [dragging, setDragging] = useState(false);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [courses, setCourses] = useState<Course[]>([]);
@@ -33,11 +39,6 @@ export default function ExtensionOverlay() {
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
 
   useEffect(() => {
-    const W = 420;
-    const w = typeof window !== "undefined" ? window.innerWidth : 800;
-    const h = typeof window !== "undefined" ? window.innerHeight : 600;
-    setPos({ x: w - W - 16, y: h / 2 - 320 });
-
     fetch("/api/user/data")
       .then((r) => r.json())
       .then((data) => {
@@ -120,13 +121,16 @@ export default function ExtensionOverlay() {
 
   const toggleVoice = () => {
     if (isListening) { setIsListening(false); return; }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const SpeechAPI = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (!SpeechAPI) { setAiResponse("Voice not supported."); return; }
-    const rec = new SpeechAPI();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const rec = new SpeechAPI() as any;
     rec.continuous = false;
     rec.interimResults = true;
     rec.onstart = () => setIsListening(true);
     rec.onend = () => setIsListening(false);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     rec.onresult = (event: any) => {
       let t = "";
       for (let i = 0; i < event.results.length; i++) t += event.results[i][0].transcript;
@@ -137,14 +141,6 @@ export default function ExtensionOverlay() {
   };
 
   const close = () => { if (window.parent !== window) window.parent.postMessage("jarvis-close", "*"); };
-
-  const getUrgency = (dueDate: string | null) => {
-    if (!dueDate) return "safe";
-    const hours = (new Date(dueDate).getTime() - now.getTime()) / (1000 * 60 * 60);
-    if (hours < 24) return "urgent";
-    if (hours < 72) return "warning";
-    return "safe";
-  };
 
   const panel = "rounded-xl border border-cyan-400/30 bg-[#0B1B3D]/80 backdrop-blur-md shadow-[0_0_20px_rgba(6,182,212,0.15)]";
 

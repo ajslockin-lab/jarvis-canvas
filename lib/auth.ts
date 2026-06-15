@@ -1,4 +1,4 @@
-import { NextAuthOptions } from "next-auth";
+import { NextAuthOptions, Session } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import { prisma } from "./prisma";
 
@@ -46,7 +46,9 @@ export const authOptions: NextAuthOptions = {
       }
       return token;
     },
-    async session({ session, token }: { session: Record<string, unknown>; token: Record<string, unknown> }) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    async session(params: any): Promise<Session> {
+      const { session, token } = params as { session: Session; token: Record<string, unknown> };
       if (session.user) {
         (session.user as Record<string, unknown>).id = token.id as string;
       }

@@ -48,7 +48,12 @@ export async function classifyIntent(text: string): Promise<NLUResult> {
     });
 
     const content = completion.choices[0]?.message?.content || "";
-    let result: any = {};
+    let result: NLUResult = {
+      intent: "general",
+      entities: {},
+      confidence: 0.5,
+      rawText: text,
+    };
     try {
       result = JSON.parse(content);
     } catch {
@@ -70,14 +75,13 @@ export async function classifyIntent(text: string): Promise<NLUResult> {
 
 export async function generateResponse(
   intent: string,
-  entities: any,
-  context: any
+  entities: NLUResult["entities"],
+  context: { assignments?: { id: string; name: string; dueDate: Date | null; courseName?: string }[]; [key: string]: unknown }
 ): Promise<string> {
-  // Build a lean summary of assignments to avoid token overflow
-  const assignments: any[] = context.assignments || [];
-  const summary = assignments.map((a: any) => {
+  const assignments = context.assignments || [];
+  const summary = assignments.map((a) => {
     const due = a.dueDate ? new Date(a.dueDate).toLocaleDateString() : "soon";
-    const course = a.courseName || a.course?.name || "";
+    const course = a.courseName || "";
     return `- ${a.name}${course ? ` (${course})` : ""} — due ${due}`;
   }).slice(0, 10); // limit to 10 to stay within token budget
 

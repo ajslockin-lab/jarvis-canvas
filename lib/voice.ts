@@ -1,9 +1,10 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // Web Speech API wrappers
 
 /**
  * Create a Web Speech API recognition instance.
  */
-export function createWebSpeechRecognizer(): any {
+export function createWebSpeechRecognizer(): InstanceType<any> | null {
   const SpeechRecognitionAPI =
     (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
 
