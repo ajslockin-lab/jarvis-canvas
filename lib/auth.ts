@@ -1,22 +1,41 @@
 import { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
+import { prisma } from "./prisma";
 
+/**
+ * NextAuth configuration.
+ * Uses a Canvas-backed credentials provider:
+ * After Canvas OAuth, a secure cookie (canvas_user_email) is set.
+ * This provider reads that cookie to establish the NextAuth session.
+ * This bridges Canvas OAuth with NextAuth's session management.
+ */
 export const authOptions: NextAuthOptions = {
   providers: [
     CredentialsProvider({
+      id: "canvas",
       name: "Canvas",
       credentials: {
         email: { label: "Email", type: "email" },
-        name: { label: "Name", type: "text" },
       },
       async authorize(credentials) {
         if (!credentials?.email) return null;
+
+        const user = await prisma.user.findUnique({
+          where: { email: credentials.email },
+          select: {
+            id: true,
+            email: true,
+            name: true,
+          },
+        });
+
+        if (!user) return null;
+
         return {
-          id: credentials.email,
-          name: credentials.name || "Student",
-          email: credentials.email,
-          image: null,
-        } as any;
+          id: user.id,
+          email: user.email,
+          name: user.name,
+        };
       },
     }),
   ],
@@ -27,8 +46,10 @@ export const authOptions: NextAuthOptions = {
       }
       return token;
     },
-    async session({ session, token }: { session: any; token: any }) {
-      session.user.id = token.id;
+    async session({ session, token }: { session: Record<string, unknown>; token: Record<string, unknown> }) {
+      if (session.user) {
+        (session.user as Record<string, unknown>).id = token.id as string;
+      }
       return session;
     },
   },
