@@ -22,6 +22,7 @@ export default function ExtensionOverlay() {
   const [dragging, setDragging] = useState(false);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [courses, setCourses] = useState<Course[]>([]);
+  const [grades, setGrades] = useState<{ name: string; percent: number }[]>([]);
   const [loading, setLoading] = useState(true);
   const [aiResponse, setAiResponse] = useState("");
   const [transcript, setTranscript] = useState("");
@@ -39,9 +40,16 @@ export default function ExtensionOverlay() {
 
     fetch("/api/user/data")
       .then((r) => r.json())
-      .then((data) => setCourses(Array.isArray(data.courses) ? data.courses : []))
+      .then((data) => {
+        setCourses(Array.isArray(data.courses) ? data.courses : []);
+      })
       .catch(() => setCourses([]))
       .finally(() => setLoading(false));
+
+    fetch("/api/canvas/grades")
+      .then((r) => r.json())
+      .then((data) => setGrades(Array.isArray(data.grades) ? data.grades : []))
+      .catch(() => setGrades([]));
   }, []);
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
@@ -248,20 +256,21 @@ export default function ExtensionOverlay() {
           {/* Grades */}
           <div>
             <h3 className="text-[10px] uppercase tracking-widest mb-2 text-cyan-300/50">Grades</h3>
-            {["Advanced Algebra", "Physics", "World History"].map((name, i) => {
-              const pct = [92, 76, 89][i];
-              return (
-                <div key={name} className="mb-2">
+            {grades.length > 0 ? (
+              grades.map((g) => (
+                <div key={g.name} className="mb-2">
                   <div className="flex justify-between text-xs mb-1">
-                    <span className="text-cyan-200">{name}</span>
-                    <span className="text-cyan-300 font-bold">{pct}%</span>
+                    <span className="text-cyan-200">{g.name}</span>
+                    <span className="text-cyan-300 font-bold">{g.percent}%</span>
                   </div>
                   <div className="h-2 w-full bg-white/10 rounded-full">
-                    <div className="h-full rounded-full bg-gradient-to-r from-cyan-400 to-blue-400" style={{ width: `${pct}%` }} />
+                    <div className="h-full rounded-full bg-gradient-to-r from-cyan-400 to-blue-400" style={{ width: `${g.percent}%` }} />
                   </div>
                 </div>
-              );
-            })}
+              ))
+            ) : (
+              <p className="text-[11px] text-cyan-300/50">Connect Canvas to see grades</p>
+            )}
           </div>
 
           {/* Voice */}

@@ -53,12 +53,12 @@ export default function Dashboard() {
           .sort((a, b) => new Date(b as string | Date).getTime() - new Date(a as string | Date).getTime())[0];
         if (latestSync) setLastSync(new Date(latestSync).toISOString());
       } else {
-        setCourses(mockCourses);
+        setCourses([]);
       }
     } catch (err) {
       console.error("Fetch error:", err);
-      setError("Couldn\u2019t fetch data. Showing demo data.");
-      setCourses(mockCourses);
+      setError("Couldn\u2019t fetch data. Connect Canvas in settings.");
+      setCourses([]);
     } finally {
       setLoading(false);
     }
@@ -205,7 +205,7 @@ export default function Dashboard() {
             className="arc-reactor-btn inline-flex items-center gap-3 px-12 py-5 font-orbitron text-sm font-bold tracking-[0.12em] uppercase"
           >
             <Mic className="w-5 h-5" />
-            <span>ACTIVATE CARVIS</span>
+            <span>ACTIVATE JARVIS</span>
           </button>
           <p className="mt-4 font-mono-data text-[11px] text-[#7d99aa] tracking-wide">
             CMD: &quot;WHAT IS DUE THIS WEEK?&quot; // &quot;REMIND ME 2 HOURS BEFORE BIO LAB&quot;
@@ -283,7 +283,7 @@ export default function Dashboard() {
                   GRADE READOUT // LIVE
                 </h2>
               </div>
-              <GradesPanel grades={demoGrades} />
+              <GradesPanel grades={[]} />
             </div>
 
             {/* Proactive Feed */}
@@ -292,7 +292,7 @@ export default function Dashboard() {
               <div className="hud-section-header mb-4">
                 <Zap className="w-4 h-4 text-[#FF9500]" />
                 <h2 className="font-orbitron text-xs font-bold tracking-[0.2em] text-[#FF9500] uppercase">
-                  CARVIS INTEL
+                  JARVIS INTEL
                 </h2>
               </div>
               <ProactiveFeed />
@@ -303,66 +303,3 @@ export default function Dashboard() {
     </div>
   );
 }
-
-const mockCourses: Course[] = [
-  {
-    id: "1",
-    name: "Advanced Algebra",
-    code: "MAT202",
-    color: null,
-    assignments: [
-      {
-        id: "a1",
-        name: "Linear Equations Problem Set",
-        description: null,
-        dueDate: new Date(Date.now() + 24 * 60 * 60 * 1000),
-        points: 50,
-        url: null,
-        completed: false,
-        course: { name: "Advanced Algebra" },
-      },
-    ],
-  },
-  {
-    id: "2",
-    name: "Physics",
-    code: "PHYS101",
-    color: null,
-    assignments: [
-      {
-        id: "a2",
-        name: "Velocity Lab Report",
-        description: null,
-        dueDate: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000),
-        points: 100,
-        url: null,
-        completed: false,
-        course: { name: "Physics" },
-      },
-    ],
-  },
-  {
-    id: "3",
-    name: "World History",
-    code: "HIS150",
-    color: null,
-    assignments: [
-      {
-        id: "a3",
-        name: "WWII Causes Essay",
-        description: null,
-        dueDate: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000),
-        points: 200,
-        url: null,
-        completed: false,
-        course: { name: "World History" },
-      },
-    ],
-  },
-];
-
-const demoGrades = [
-  { name: "Advanced Algebra", percent: 92, trend: "up" as const, change: 3 },
-  { name: "Physics", percent: 76, trend: "same" as const, change: 0 },
-  { name: "World History", percent: 89, trend: "up" as const, change: 1 },
-];
