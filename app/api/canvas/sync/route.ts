@@ -1,8 +1,19 @@
 import { NextResponse } from "next/server";
 import { fetchCanvasCourses, fetchCanvasAssignments } from "@/lib/canvas";
+import { fetchEnrollmentsWithGrades } from "@/lib/canvas-grades";
 import { requireAuth, getCanvasToken } from "@/lib/with-auth";
 import { apiError } from "@/lib/errors";
 import { prisma } from "@/lib/prisma";
+import { encrypt } from "@/lib/crypto";
+
+function computeLetterGrade(score: number | null): string | null {
+  if (score === null) return null;
+  if (score >= 90) return "A";
+  if (score >= 80) return "B";
+  if (score >= 70) return "C";
+  if (score >= 60) return "D";
+  return "F";
+}
 
 export async function POST() {
   try {
@@ -40,7 +51,7 @@ export async function POST() {
       courseCount++;
 
       try {
-        const assignments = await fetchCanvasAssignments(token, user.canvasBaseUrl!, String(c.id));
+        const assignments = await fetchCanvasAssignments(token, user.canvasBaseUrl, String(c.id));
         for (const a of assignments || []) {
           if (!a.id) continue;
           await prisma.assignment.upsert({
@@ -66,6 +77,50 @@ export async function POST() {
         }
       } catch (err) {
         console.warn(`Failed to sync assignments for course ${c.id}:`, err);
+      }
+    }
+
+    // Sync grades from Canvas enrollments
+    if (user.canvasUserId) {
+      try {
+        const enrollmentGrades = await fetchEnrollmentsWithGrades(
+          token,
+          user.canvasBaseUrl,
+          user.canvasUserId
+        );
+
+        for (const eg of enrollmentGrades) {
+          // Verify the course belongs to this user
+          const course = await prisma.course.findFirst({
+            where: { id: eg.courseId, userId: user.id },
+          });
+          if (!course) continue;
+
+          const letterGrade = computeLetterGrade(eg.currentScore);
+
+          await prisma.grade.upsert({
+            where: {
+              userId_courseId: { userId: user.id, courseId: eg.courseId },
+            },
+            create: {
+              userId: user.id,
+              courseId: eg.courseId,
+              currentScore: eg.currentScore,
+              finalScore: eg.finalScore,
+              letterGrade,
+              fetchedAt: new Date(),
+            },
+            update: {
+              currentScore: eg.currentScore,
+              finalScore: eg.finalScore,
+              letterGrade,
+              fetchedAt: new Date(),
+            },
+          });
+        }
+      } catch (err) {
+        console.warn("Failed to sync grades:", err);
+        // Non-fatal — sync still reports success for courses/assignments
       }
     }
 

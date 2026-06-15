@@ -1,25 +1,35 @@
 "use client";
 
-import { ExternalLink } from "lucide-react";
+import { useState } from "react";
+import { ExternalLink, Check } from "lucide-react";
 import Link from "next/link";
 
 interface AssignmentCardProps {
+  id?: string;
   name: string;
   courseName?: string;
   dueDate?: string | Date | null;
   url?: string | null;
   points?: number | null;
+  completed?: boolean;
   referenceDate?: Date;
+  onToggle?: (id: string, completed: boolean) => void;
 }
 
 export default function AssignmentCard({
+  id,
   name,
   courseName,
   dueDate,
   url,
   points,
+  completed = false,
   referenceDate = new Date(0),
+  onToggle,
 }: AssignmentCardProps) {
+  const [isCompleted, setIsCompleted] = useState(completed);
+  const [toggling, setToggling] = useState(false);
+
   const getUrgency = (date: Date) => {
     const diff = date.getTime() - referenceDate.getTime();
     const hours = diff / (1000 * 60 * 60);
@@ -45,16 +55,56 @@ export default function AssignmentCard({
     ? due.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false })
     : "";
 
+  const handleToggle = async () => {
+    if (!id || toggling) return;
+    setToggling(true);
+
+    // Optimistic update
+    const newCompleted = !isCompleted;
+    setIsCompleted(newCompleted);
+
+    try {
+      const res = await fetch("/api/canvas/assignments/toggle", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ assignmentId: id, completed: newCompleted }),
+      });
+
+      if (!res.ok) {
+        // Rollback on failure
+        setIsCompleted(!newCompleted);
+      } else {
+        onToggle?.(id, newCompleted);
+      }
+    } catch {
+      // Rollback on network error
+      setIsCompleted(!newCompleted);
+    } finally {
+      setToggling(false);
+    }
+  };
+
   return (
-    <div className="hud-card group">
+    <div className={`hud-card group ${isCompleted ? "opacity-60" : ""}`}>
       <div
         className="p-4 h-full flex flex-col"
-        style={{ borderLeft: isOverdue ? "2px solid #FF4D4D" : isUrgent ? "2px solid #FF9500" : "2px solid #00B4FF" }}
+        style={{ borderLeft: isCompleted ? "2px solid #00FF88" : isOverdue ? "2px solid #FF4D4D" : isUrgent ? "2px solid #FF9500" : "2px solid #00B4FF" }}
       >
         <div className="flex items-start justify-between gap-3 mb-2">
           <div className="flex items-start gap-2 min-w-0">
-            <div className={`w-1.5 h-1.5 rounded-full mt-1.5 shrink-0 ${urgency.dot} ${isUrgent ? "animate-pulse" : ""}`} />
-            <h3 className="font-orbitron text-[13px] font-bold text-[#e8f4f8] leading-tight truncate">
+            {/* Completion toggle */}
+            <button
+              onClick={handleToggle}
+              disabled={toggling}
+              className={`w-4 h-4 mt-1 rounded-sm border shrink-0 flex items-center justify-center transition ${
+                isCompleted
+                  ? "bg-[#00FF88]/20 border-[#00FF88]/50 text-[#00FF88]"
+                  : "border-[#5a7a8a]/40 hover:border-[#00FF88]/60 text-transparent hover:text-[#00FF88]/40"
+              }`}
+            >
+              <Check className="w-3 h-3" />
+            </button>
+            <h3 className={`font-orbitron text-[13px] font-bold leading-tight truncate ${isCompleted ? "text-[#5a7a8a] line-through" : "text-[#e8f4f8]"}`}>
               {name}
             </h3>
           </div>
@@ -70,7 +120,7 @@ export default function AssignmentCard({
         </div>
 
         {courseName && (
-          <p className="font-mono-data text-[11px] text-[#5a7a8a] tracking-wide mb-1">
+          <p className={`font-mono-data text-[11px] tracking-wide mb-1 ${isCompleted ? "text-[#5a7a8a]/50" : "text-[#5a7a8a]"}`}>
             {courseName.toUpperCase()}
           </p>
         )}
@@ -78,8 +128,8 @@ export default function AssignmentCard({
         <div className="flex-1" />
 
         <div className="flex items-center justify-between mt-2 pt-2 border-t border-[#00B4FF]/5">
-          <span className={`font-mono-data text-[11px] font-bold ${isOverdue ? "text-[#FF4D4D]" : urgency.color}`}>
-            {isOverdue ? `OVERDUE ${Math.abs(hoursLeft)}H` : isUrgent ? `DUE ${hoursLeft}H` : `${dueText} ${dueTime}`}
+          <span className={`font-mono-data text-[11px] font-bold ${isCompleted ? "text-[#00FF88]" : isOverdue ? "text-[#FF4D4D]" : urgency.color}`}>
+            {isCompleted ? "DONE" : isOverdue ? `OVERDUE ${Math.abs(hoursLeft!)}H` : isUrgent ? `DUE ${hoursLeft}H` : `${dueText} ${dueTime}`}
           </span>
           {points !== null && points !== undefined && (
             <span className="font-mono-data text-[10px] text-[#5a7a8a]">

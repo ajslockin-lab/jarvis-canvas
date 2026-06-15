@@ -31,6 +31,7 @@ interface Assignment {
 export default function Dashboard() {
   const [voiceOpen, setVoiceOpen] = useState(false);
   const [courses, setCourses] = useState<Course[]>([]);
+  const [grades, setGrades] = useState<{ name: string; percent: number; trend?: "up" | "down" | "same"; change?: number }[]>([]);
   const [loading, setLoading] = useState(true);
   const [lastSync, setLastSync] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
@@ -54,6 +55,22 @@ export default function Dashboard() {
         if (latestSync) setLastSync(new Date(latestSync).toISOString());
       } else {
         setCourses([]);
+      }
+
+      // Fetch grades
+      try {
+        const gradesRes = await fetch("/api/canvas/grades");
+        const gradesData = await gradesRes.json();
+        if (Array.isArray(gradesData.grades)) {
+          setGrades(
+            gradesData.grades.map((g: { name: string; currentScore: number | null }) => ({
+              name: g.name,
+              percent: g.currentScore ?? 0,
+            }))
+          );
+        }
+      } catch {
+        // Grades fetch is non-fatal
       }
     } catch (err) {
       console.error("Fetch error:", err);
@@ -89,6 +106,15 @@ export default function Dashboard() {
     const timer = setInterval(() => setCurrentTime(new Date()), 60000);
     return () => clearInterval(timer);
   }, []);
+
+  // Auto-sync if data is stale (>30 min since last sync)
+  useEffect(() => {
+    if (!lastSync || syncing) return;
+    const staleMinutes = (Date.now() - new Date(lastSync).getTime()) / (1000 * 60);
+    if (staleMinutes > 30) {
+      handleSync();
+    }
+  }, [lastSync]);
 
   const now = new Date();
   const allAssignments = courses
@@ -240,11 +266,13 @@ export default function Dashboard() {
                 {upcomingAssignments.map((assignment) => (
                   <AssignmentCard
                     key={assignment.id}
+                    id={assignment.id}
                     name={assignment.name}
                     courseName={assignment.course?.name}
                     dueDate={assignment.dueDate}
                     url={assignment.url}
                     points={assignment.points}
+                    completed={assignment.completed}
                     referenceDate={currentTime}
                   />
                 ))}
@@ -283,7 +311,7 @@ export default function Dashboard() {
                   GRADE READOUT // LIVE
                 </h2>
               </div>
-              <GradesPanel grades={[]} />
+              <GradesPanel grades={grades} />
             </div>
 
             {/* Proactive Feed */}
