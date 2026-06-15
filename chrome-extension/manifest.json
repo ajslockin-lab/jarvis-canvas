@@ -1,0 +1,19 @@
+{
+  "manifest_version": 3,
+  "name": "JARVIS Canvas Assistant",
+  "version": "0.1.0",
+  "description": "Your personal Canvas AI assistant - voice commands, deadlines, grades, and page control",
+  "permissions": ["activeTab", "storage"],
+  "content_scripts": [
+    {
+      "matches": [
+        "*://*/*canvas*",
+        "*://gavirtual.instructure.com/*",
+        "*://*.instructure.com/*"
+      ],
+      "js": ["contentScript.js"],
+      "css": ["styles.css"],
+      "run_at": "document_end"
+    }
+  ]
+}

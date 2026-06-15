@@ -1,0 +1,74 @@
+<h2>JARVIS Hologram — v2 Layout</h2>
+<p class="subtitle">Transparent overlay. Deadlines left, Grades right, AI + mic at bottom.</p>
+
+<div style="display:flex;flex-direction:column;gap:16px;align-items:center;margin-top:20px">
+  <div class="mockup" style="width:100%;max-width:900px;position:relative;overflow:hidden;border-radius:12px;border:1px solid #1a3a5f;background:#0a0f1a">
+    <!-- Fake Canvas behind -->
+    <div style="padding:24px 32px">
+      <div style="height:8px;width:120px;background:#333;border-radius:4px;margin-bottom:16px"></div>
+      <div style="display:flex;gap:16px">
+        <div style="flex:2">
+          <div style="height:160px;background:#1a1a2e;border-radius:8px;margin-bottom:12px"></div>
+          <div style="height:80px;background:#1a1a2e;border-radius:8px"></div>
+        </div>
+        <div style="flex:1">
+          <div style="height:240px;background:#1a1a2e;border-radius:8px"></div>
+        </div>
+      </div>
+    </div>
+    <!-- JARVIS Overlay with v2 layout -->
+    <div style="position:absolute;inset:0;background:rgba(2,6,23,0.65);backdrop-filter:blur(12px);display:flex;flex-direction:column;padding:32px;gap:16px">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <h3 style="color:#06b6d4;font-size:20px;letter-spacing:2px;text-shadow:0 0 10px #06b6d460">JARVIS</h3>
+        <span style="color:#06b6d4aa;font-size:11px;border:1px solid #06b6d444;padding:4px 12px;border-radius:20px">ONLINE</span>
+      </div>
+      <!-- TOP ROW: Deadlines (left) + Grades (right) -->
+      <div style="display:flex;gap:12px;flex:1;min-height:0">
+        <!-- LEFT: Upcoming Deadlines -->
+        <div style="flex:3;padding:16px;background:rgba(6,182,212,0.05);border:1px solid #06b6d440;border-radius:10px;overflow:auto">
+          <div style="font-size:11px;color:#06b6d4;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:12px">📋 Upcoming Deadlines</div>
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <div style="padding:10px 12px;background:rgba(6,182,212,0.08);border-radius:6px;border-left:3px solid #06b6d4">
+              <div style="height:12px;background:#06b6d412;border-radius:3px"></div>
+              <div style="height:8px;width:60%;background:#06b6d412;border-radius:3px;margin-top:4px"></div>
+            </div>
+            <div style="padding:10px 12px;background:rgba(6,182,212,0.08);border-radius:6px;border-left:3px solid #f59e0b">
+              <div style="height:12px;background:#06b6d412;border-radius:3px"></div>
+              <div style="height:8px;width:60%;background:#06b6d412;border-radius:3px;margin-top:4px"></div>
+            </div>
+            <div style="padding:10px 12px;background:rgba(6,182,212,0.08);border-radius:6px;border-left:3px solid #10b981">
+              <div style="height:12px;background:#06b6d412;border-radius:3px"></div>
+              <div style="height:8px;width:60%;background:#06b6d412;border-radius:3px;margin-top:4px"></div>
+            </div>
+          </div>
+        </div>
+        <!-- RIGHT: Grades -->
+        <div style="flex:1;min-width:180px;padding:16px;background:rgba(6,182,212,0.05);border:1px solid #06b6d440;border-radius:10px">
+          <div style="font-size:11px;color:#06b6d4;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:12px">📊 Grades</div>
+          <div style="display:flex;flex-direction:column;gap:12px">
+            <div style="display:flex;flex-direction:column;gap:4px">
+              <div style="display:flex;justify-content:space-between;font-size:12px;color:#aaa"><span>Bio 101</span><span style="color:#10b981;font-weight:bold">A-</span></div>
+              <div style="height:4px;background:#1a3a5f;border-radius:2px;overflow:hidden"><div style="width:92%;height:100%;background:linear-gradient(90deg,#10b981,#3b82f6)"></div></div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:4px">
+              <div style="display:flex;justify-content:space-between;font-size:12px;color:#aaa"><span>Physics</span><span style="color:#f59e0b;font-weight:bold">B</span></div>
+              <div style="height:4px;background:#1a3a5f;border-radius:2px;overflow:hidden"><div style="width:76%;height:100%;background:linear-gradient(90deg,#f59e0b,#f97316)"></div></div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:4px">
+              <div style="display:flex;justify-content:space-between;font-size:12px;color:#aaa"><span>History</span><span style="color:#06b6d4;font-weight:bold">B+</span></div>
+              <div style="height:4px;background:#1a3a5f;border-radius:2px;overflow:hidden"><div style="width:89%;height:100%;background:linear-gradient(90deg,#06b6d4,#3b82f6)"></div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <!-- BOTTOM: AI Chat with Mic -->
+      <div style="padding:12px 16px;background:rgba(6,182,212,0.05);border:1px solid #06b6d440;border-radius:10px">
+        <div style="font-size:11px;color:#06b6d4;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:8px">🎙️ Ask JARVIS</div>
+        <div style="display:flex;align-items:center;gap:12px">
+          <div style="width:40px;height:40px;border-radius:50%;background:linear-gradient(135deg,#06b6d4,#3b82f6);box-shadow:0 0 20px #06b6d480;display:flex;align-items:center;justify-content:center;font-size:16px;cursor:pointer">🎙️</div>
+          <span style="color:#06b6d460;font-size:12px">Tap & Hold to Speak — &quot;What do I have due?&quot;</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
