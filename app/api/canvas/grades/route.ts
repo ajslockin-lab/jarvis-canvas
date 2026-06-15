@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requireAuth, getCanvasToken } from "@/lib/with-auth";
+import { requireAuth } from "@/lib/with-auth";
 import { apiError } from "@/lib/errors";
 import { prisma } from "@/lib/prisma";
 

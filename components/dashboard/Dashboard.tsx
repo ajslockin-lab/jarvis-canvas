@@ -112,8 +112,28 @@ export default function Dashboard() {
     if (!lastSync || syncing) return;
     const staleMinutes = (Date.now() - new Date(lastSync).getTime()) / (1000 * 60);
     if (staleMinutes > 30) {
-      handleSync();
+      // Use a ref-safe callback to avoid cascading render from setState in effect
+      const doSync = async () => {
+        setSyncing(true);
+        setError(null);
+        try {
+          const res = await fetch("/api/canvas/sync", { method: "POST" });
+          const data = await res.json();
+          if (data.success) {
+            setLastSync(new Date().toISOString());
+            await fetchData();
+          } else {
+            setError(data.error || "Sync failed");
+          }
+        } catch {
+          setError("Sync error - check Canvas token.");
+        } finally {
+          setSyncing(false);
+        }
+      };
+      doSync();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lastSync]);
 
   const now = new Date();
