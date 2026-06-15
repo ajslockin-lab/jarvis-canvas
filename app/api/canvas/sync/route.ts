@@ -1,46 +1,25 @@
 import { NextResponse } from "next/server";
 import { fetchCanvasCourses, fetchCanvasAssignments } from "@/lib/canvas";
+import { requireAuth, getCanvasToken } from "@/lib/with-auth";
+import { apiError } from "@/lib/errors";
 import { prisma } from "@/lib/prisma";
-
-// Use personal token from env
-const CANVAS_TOKEN = process.env.CANVAS_PERSONAL_TOKEN;
-const CANVAS_DOMAIN = process.env.CANVAS_DOMAIN;
 
 export async function POST() {
   try {
-    if (!CANVAS_TOKEN || !CANVAS_DOMAIN) {
-      return NextResponse.json(
-        { error: "Canvas credentials not configured" },
-        { status: 500 }
-      );
+    const { user, error: authError } = await requireAuth();
+    if (authError) return authError;
+
+    const token = await getCanvasToken(user);
+    if (!token || !user.canvasBaseUrl) {
+      return apiError("CANVAS_AUTH", { error: "Canvas not connected — please link your Canvas account" });
     }
 
-    // Get or create user
-    let user = await prisma.user.findFirst({
-      where: { email: "student@gavirtual.instructure.com" },
-    });
+    const courses = await fetchCanvasCourses(token, user.canvasBaseUrl);
 
-    if (!user) {
-      user = await prisma.user.create({
-        data: {
-          email: "student@gavirtual.instructure.com",
-          name: "GAVS Student",
-          canvasToken: CANVAS_TOKEN,
-          canvasDomain: CANVAS_DOMAIN,
-        },
-      });
-    }
-
-    // Fetch courses from Canvas
-    const courses = await fetchCanvasCourses(CANVAS_TOKEN, CANVAS_DOMAIN);
-
+    let courseCount = 0;
     for (const c of courses || []) {
-      if (!c.id) continue;
+      if (!c.id || c.workflow_state !== "available") continue;
 
-      // Only sync active courses
-      if (c.workflow_state !== "available") continue;
-
-      // Upsert course
       await prisma.course.upsert({
         where: { id: String(c.id) },
         create: {
@@ -58,10 +37,10 @@ export async function POST() {
           lastSynced: new Date(),
         },
       });
+      courseCount++;
 
-      // Fetch and upsert assignments
       try {
-        const assignments = await fetchCanvasAssignments(CANVAS_TOKEN, CANVAS_DOMAIN, String(c.id));
+        const assignments = await fetchCanvasAssignments(token, user.canvasBaseUrl!, String(c.id));
         for (const a of assignments || []) {
           if (!a.id) continue;
           await prisma.assignment.upsert({
@@ -90,15 +69,9 @@ export async function POST() {
       }
     }
 
-    return NextResponse.json({
-      success: true,
-      courseCount: courses?.length || 0,
-    });
+    return NextResponse.json({ success: true, courseCount });
   } catch (error) {
     console.error("Canvas sync error:", error);
-    return NextResponse.json(
-      { error: "Canvas sync failed" },
-      { status: 500 }
-    );
+    return apiError("CANVAS_API", { error: "Canvas sync failed" });
   }
 }
