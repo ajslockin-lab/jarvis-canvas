@@ -1,14 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import { Link2, Check, Loader2, ExternalLink } from "lucide-react";
+import { Link2, Check, Loader2 } from "lucide-react";
 
 interface CanvasConnectButtonProps {
   connected?: boolean;
   onConnect?: (canvasUrl: string) => void;
 }
 
-export default function CanvasConnectButton({ connected, onConnect }: CanvasConnectButtonProps) {
+export default function CanvasConnectButton({ connected, onConnect: _onConnect }: CanvasConnectButtonProps) {
   const [status, setStatus] = useState<"idle" | "submitting" | "error">("idle");
   const [canvasUrl, setCanvasUrl] = useState("");
   const [error, setError] = useState<string | null>(null);
