@@ -17,8 +17,12 @@ interface Course {
   assignments: Assignment[];
 }
 
+interface Grade {
+  name: string;
+  percent: number;
+}
+
 export default function ExtensionOverlay() {
-  // Compute initial position outside effect to avoid cascading renders
   const [pos, setPos] = useState(() => {
     if (typeof window === "undefined") return { x: 0, y: 0 };
     const w = window.innerWidth;
@@ -28,7 +32,7 @@ export default function ExtensionOverlay() {
   const [dragging, setDragging] = useState(false);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [courses, setCourses] = useState<Course[]>([]);
-  const [grades, setGrades] = useState<{ name: string; percent: number }[]>([]);
+  const [grades, setGrades] = useState<Grade[]>([]);
   const [loading, setLoading] = useState(true);
   const [aiResponse, setAiResponse] = useState("");
   const [transcript, setTranscript] = useState("");
@@ -37,19 +41,40 @@ export default function ExtensionOverlay() {
   const [calDate, setCalDate] = useState(new Date());
   const [showCalendar, setShowCalendar] = useState(true);
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
+  const [authed, setAuthed] = useState(false);
 
   useEffect(() => {
+    // Fetch user data (courses + assignments)
     fetch("/api/user/data")
-      .then((r) => r.json())
+      .then((r) => {
+        if (r.status === 401) {
+          setAuthed(false);
+          return null;
+        }
+        setAuthed(true);
+        return r.json();
+      })
       .then((data) => {
-        setCourses(Array.isArray(data.courses) ? data.courses : []);
+        if (!data) return;
+        const c = Array.isArray(data.courses) ? data.courses : [];
+        setCourses(c as Course[]);
       })
       .catch(() => setCourses([]))
       .finally(() => setLoading(false));
 
+    // Fetch grades
     fetch("/api/canvas/grades")
       .then((r) => r.json())
-      .then((data) => setGrades(Array.isArray(data.grades) ? data.grades : []))
+      .then((data) => {
+        if (Array.isArray(data.grades)) {
+          setGrades(
+            data.grades.map((g: { name: string; currentScore: number | null }) => ({
+              name: g.name,
+              percent: g.currentScore ?? 0,
+            }))
+          );
+        }
+      })
       .catch(() => setGrades([]));
   }, []);
 
@@ -123,7 +148,7 @@ export default function ExtensionOverlay() {
     if (isListening) { setIsListening(false); return; }
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const SpeechAPI = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (!SpeechAPI) { setAiResponse("Voice not supported."); return; }
+    if (!SpeechAPI) { setAiResponse("Voice not supported in this browser."); return; }
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const rec = new SpeechAPI() as any;
     rec.continuous = false;
@@ -143,8 +168,29 @@ export default function ExtensionOverlay() {
   const close = () => { if (window.parent !== window) window.parent.postMessage("jarvis-close", "*"); };
 
   const panel = "rounded-xl border border-cyan-400/30 bg-[#0B1B3D]/80 backdrop-blur-md shadow-[0_0_20px_rgba(6,182,212,0.15)]";
-
   const selectedDayAssignments = selectedDay ? getAssignmentsForDay(selectedDay) : [];
+
+  // Not signed in — show connect prompt
+  if (!authed && !loading) {
+    return (
+      <div className="min-h-screen w-full flex items-center justify-center">
+        <div className={`fixed w-[380px] ${panel} p-6 text-center`}>
+          <div className="flex items-center justify-center gap-2 mb-4">
+            <Sparkles className="w-5 h-5 text-cyan-400" />
+            <span className="text-sm font-bold text-cyan-300 tracking-wider">JARVIS</span>
+          </div>
+          <p className="text-sm text-cyan-300/70 mb-4">Sign in to access your Canvas data</p>
+          <a
+            href="/signin"
+            target="_blank"
+            className="inline-flex items-center gap-2 px-4 py-2 bg-cyan-500/20 border border-cyan-400/40 text-cyan-200 text-sm font-bold rounded hover:bg-cyan-500/30 transition"
+          >
+            CONNECT CANVAS
+          </a>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen w-full">
@@ -164,7 +210,6 @@ export default function ExtensionOverlay() {
         <div className="p-4 space-y-4 max-h-[80vh] overflow-y-auto">
           {/* Calendar */}
           <div className={panel + " p-3"}>
-            {/* Calendar header with toggle */}
             <button
               onClick={() => setShowCalendar(!showCalendar)}
               className="w-full flex items-center justify-between mb-1 hover:text-cyan-100 transition-colors"
@@ -174,7 +219,6 @@ export default function ExtensionOverlay() {
             </button>
 
             <div className={`overflow-hidden transition-all duration-300 ${showCalendar ? "max-h-[400px] opacity-100" : "max-h-0 opacity-0"}`}>
-              {/* Month navigation */}
               <div className="flex items-center justify-between mb-2">
                 <button onClick={() => setCalDate(new Date(calDate.getFullYear(), calDate.getMonth() - 1))} className="text-cyan-400 hover:text-cyan-200"><ChevronLeft className="w-4 h-4" /></button>
                 <span className="text-xs font-semibold text-cyan-300/70">{calDate.toLocaleString("en-US", { month: "long", year: "numeric" })}</span>
@@ -202,7 +246,6 @@ export default function ExtensionOverlay() {
                 })}
               </div>
 
-              {/* Selected day assignments */}
               {selectedDayAssignments.length > 0 && (
                 <div className="mt-3 pt-3 border-t border-cyan-400/20 space-y-2">
                   <div className="flex items-center justify-between">
@@ -232,13 +275,15 @@ export default function ExtensionOverlay() {
               <div className="space-y-2">
                 {topAssignments.map((a) => {
                   const hours = a.dueDate ? Math.ceil((new Date(a.dueDate).getTime() - now.getTime()) / (1000 * 60 * 60)) : null;
+                  const isOverdue = hours !== null && hours < 0;
+                  const isUrgent = hours !== null && hours >= 0 && hours < 24;
                   return (
                     <a key={a.id} href={a.url || "#"} target="_blank" rel="noopener noreferrer"
-                      className="block p-2 rounded border border-cyan-400/20 bg-cyan-950/30 hover:border-cyan-400/40 transition">
+                      className={`block p-2 rounded border hover:border-cyan-400/40 transition ${isOverdue ? "border-red-400/30 bg-red-950/20" : isUrgent ? "border-amber-400/30 bg-amber-950/20" : "border-cyan-400/20 bg-cyan-950/30"}`}>
                       <p className="text-xs font-semibold text-cyan-100">{a.name}</p>
                       <p className="text-[10px] text-cyan-300/50">{a.courseName}</p>
-                      <span className="text-[10px] font-mono text-cyan-300">
-                        {hours && hours < 24 ? `${hours}h` : a.dueDate ? new Date(a.dueDate).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : ""}
+                      <span className={`text-[10px] font-mono ${isOverdue ? "text-red-400" : isUrgent ? "text-amber-400" : "text-cyan-300"}`}>
+                        {isOverdue ? `OVERDUE ${Math.abs(hours!)}h` : isUrgent ? `${hours}h left` : a.dueDate ? new Date(a.dueDate).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : ""}
                       </span>
                     </a>
                   );
@@ -257,10 +302,10 @@ export default function ExtensionOverlay() {
                 <div key={g.name} className="mb-2">
                   <div className="flex justify-between text-xs mb-1">
                     <span className="text-cyan-200">{g.name}</span>
-                    <span className="text-cyan-300 font-bold">{g.percent}%</span>
+                    <span className={`font-bold ${g.percent >= 85 ? "text-green-400" : g.percent >= 70 ? "text-amber-400" : "text-red-400"}`}>{g.percent}%</span>
                   </div>
                   <div className="h-2 w-full bg-white/10 rounded-full">
-                    <div className="h-full rounded-full bg-gradient-to-r from-cyan-400 to-blue-400" style={{ width: `${g.percent}%` }} />
+                    <div className={`h-full rounded-full ${g.percent >= 85 ? "bg-gradient-to-r from-green-400 to-emerald-400" : g.percent >= 70 ? "bg-gradient-to-r from-amber-400 to-yellow-400" : "bg-gradient-to-r from-red-400 to-rose-400"}`} style={{ width: `${g.percent}%` }} />
                   </div>
                 </div>
               ))
