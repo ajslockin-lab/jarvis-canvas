@@ -16,7 +16,7 @@ const toggleSchema = z.object({
  */
 export async function PATCH(req: NextRequest) {
   try {
-    const { user, error: authError } = await requireAuth();
+    const { user, error: authError } = await requireAuth(req);
     if (authError) return authError;
 
     const body = await req.json();

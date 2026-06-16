@@ -7,7 +7,7 @@ import { voiceCommandSchema } from "@/lib/validators";
 
 export async function POST(req: NextRequest) {
   try {
-    const { user, error: authError } = await requireAuth();
+    const { user, error: authError } = await requireAuth(req);
     if (authError) return authError;
 
     const body = await req.json();

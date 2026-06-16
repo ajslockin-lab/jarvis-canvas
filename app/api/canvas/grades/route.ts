@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/with-auth";
 import { apiError } from "@/lib/errors";
 import { prisma } from "@/lib/prisma";
@@ -8,9 +8,9 @@ import { prisma } from "@/lib/prisma";
  * Returns real grades for the authenticated user from the local DB.
  * Grades are synced from Canvas via the /api/canvas/sync route.
  */
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
-    const { user, error: authError } = await requireAuth();
+    const { user, error: authError } = await requireAuth(req);
     if (authError) return authError;
 
     const grades = await prisma.grade.findMany({

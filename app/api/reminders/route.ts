@@ -4,9 +4,9 @@ import { apiError } from "@/lib/errors";
 import { createReminderSchema, updateReminderSchema } from "@/lib/validators";
 import { prisma } from "@/lib/prisma";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
-    const { user, error: authError } = await requireAuth();
+    const { user, error: authError } = await requireAuth(req);
     if (authError) return authError;
 
     const reminders = await prisma.reminder.findMany({
@@ -23,7 +23,7 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   try {
-    const { user, error: authError } = await requireAuth();
+    const { user, error: authError } = await requireAuth(req);
     if (authError) return authError;
 
     const body = await req.json();
@@ -55,7 +55,7 @@ export async function POST(req: NextRequest) {
 
 export async function PATCH(req: NextRequest) {
   try {
-    const { user, error: authError } = await requireAuth();
+    const { user, error: authError } = await requireAuth(req);
     if (authError) return authError;
 
     const body = await req.json();

@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { fetchCanvasCourses, fetchCanvasAssignments } from "@/lib/canvas";
 import { fetchEnrollmentsWithGrades } from "@/lib/canvas-grades";
 import { requireAuth, getCanvasToken } from "@/lib/with-auth";
@@ -14,9 +14,9 @@ function computeLetterGrade(score: number | null): string | null {
   return "F";
 }
 
-export async function POST() {
+export async function POST(req: NextRequest) {
   try {
-    const { user, error: authError } = await requireAuth();
+    const { user, error: authError } = await requireAuth(req);
     if (authError) return authError;
 
     const token = await getCanvasToken(user);
