@@ -23,12 +23,20 @@ interface Grade {
 }
 
 export default function ExtensionOverlay() {
-  const [pos, setPos] = useState(() => {
-    if (typeof window === "undefined") return { x: 0, y: 0 };
-    const w = window.innerWidth;
-    const h = window.innerHeight;
-    return { x: w - 420 - 16, y: h / 2 - 320 };
-  });
+  const [pos, setPos] = useState({ x: 0, y: 0 });
+  const [mounted, setMounted] = useState(false);
+
+  // Set initial position client-side to avoid hydration mismatch
+  useEffect(() => {
+    if (!mounted) {
+      const w = window.innerWidth;
+      const h = window.innerHeight;
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setPos({ x: w - 420 - 16, y: h / 2 - 320 });
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setMounted(true);
+    }
+  }, [mounted]);
   const [dragging, setDragging] = useState(false);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [courses, setCourses] = useState<Course[]>([]);
@@ -172,6 +180,46 @@ export default function ExtensionOverlay() {
 
   // Not signed in — show connect prompt
   if (!authed && !loading) {
+    // Open signin in a new tab, then poll for auth cookie
+    const handleConnect = () => {
+      window.open("/signin", "_blank");
+      // Poll every 2s to see if user has authenticated
+      const interval = setInterval(() => {
+        fetch("/api/user/data")
+          .then((r) => {
+            if (r.status !== 401) {
+              clearInterval(interval);
+              setAuthed(true);
+              setLoading(true);
+              // Re-fetch data
+              fetch("/api/user/data")
+                .then((res) => res.json())
+                .then((data) => {
+                  const c = Array.isArray(data.courses) ? data.courses : [];
+                  setCourses(c as Course[]);
+                })
+                .finally(() => setLoading(false));
+              fetch("/api/canvas/grades")
+                .then((r) => r.json())
+                .then((data) => {
+                  if (Array.isArray(data.grades)) {
+                    setGrades(
+                      data.grades.map((g: { name: string; currentScore: number | null }) => ({
+                        name: g.name,
+                        percent: g.currentScore ?? 0,
+                      }))
+                    );
+                  }
+                })
+                .catch(() => {});
+            }
+          })
+          .catch(() => {});
+      }, 2000);
+      // Stop polling after 5 minutes
+      setTimeout(() => clearInterval(interval), 300000);
+    };
+
     return (
       <div className="min-h-screen w-full flex items-center justify-center">
         <div className={`fixed w-[380px] ${panel} p-6 text-center`}>
@@ -180,13 +228,13 @@ export default function ExtensionOverlay() {
             <span className="text-sm font-bold text-cyan-300 tracking-wider">JARVIS</span>
           </div>
           <p className="text-sm text-cyan-300/70 mb-4">Sign in to access your Canvas data</p>
-          <a
-            href="/signin"
-            target="_blank"
+          <button
+            onClick={handleConnect}
             className="inline-flex items-center gap-2 px-4 py-2 bg-cyan-500/20 border border-cyan-400/40 text-cyan-200 text-sm font-bold rounded hover:bg-cyan-500/30 transition"
           >
             CONNECT CANVAS
-          </a>
+          </button>
+          <p className="text-[10px] text-cyan-300/40 mt-3">Opens in a new tab — this panel will auto-refresh</p>
         </div>
       </div>
     );
@@ -194,7 +242,7 @@ export default function ExtensionOverlay() {
 
   return (
     <div className="min-h-screen w-full">
-      <div className={`fixed w-[420px] ${panel} overflow-hidden`} style={{ left: pos.x, top: pos.y }}>
+      <div className={`fixed w-[420px] ${panel} overflow-hidden transition-opacity duration-300 ${mounted ? "opacity-100" : "opacity-0"}`} style={{ left: pos.x, top: pos.y }}>
         {/* Drag handle */}
         <div
           className="cursor-move px-4 py-3 flex items-center justify-between bg-gradient-to-r from-cyan-500/10 to-blue-500/10 border-b border-cyan-400/20"
