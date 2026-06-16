@@ -47,19 +47,24 @@ export async function requireAuth(): Promise<{ user: AuthedUser; error: null } |
 }
 
 /**
- * Checks if user has a valid Canvas connection.
- * Returns decrypted access token or null.
+ * Decrypts and returns the user's Canvas access token.
+ * Works with both OAuth tokens (with refresh) and Personal Access Tokens (no expiry).
+ * Returns null if no token is stored.
  */
 export async function getCanvasToken(user: AuthedUser): Promise<string | null> {
   if (!user.canvasAccessTokenEncrypted || !user.canvasBaseUrl) {
     return null;
   }
 
+  // If token has an expiry and is expired, try OAuth refresh
   if (user.canvasTokenExpiresAt && new Date() > user.canvasTokenExpiresAt) {
-    const { refreshCanvasToken } = await import("./canvas-auth");
-    const newToken = await refreshCanvasToken(user.id);
-    if (!newToken) return null;
-    return newToken;
+    if (user.canvasRefreshTokenEncrypted) {
+      const { refreshCanvasToken } = await import("./canvas-auth");
+      const newToken = await refreshCanvasToken(user.id);
+      if (!newToken) return null;
+      return newToken;
+    }
+    // PATs don't expire — if there's no refresh token, the token is still valid
   }
 
   const { decrypt } = await import("./crypto");
