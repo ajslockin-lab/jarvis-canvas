@@ -18,9 +18,8 @@ const patSchema = z.object({
 
 /**
  * POST /api/auth/canvas/pat
- * Verifies a Canvas Personal Access Token by calling /api/v1/users/self,
- * then upserts the user, encrypts the token, and returns user info.
- * The frontend then calls NextAuth signIn() to create a session.
+ * Verifies a Canvas Personal Access Token, upserts user,
+ * sets a session cookie, and returns user info.
  */
 export async function POST(req: NextRequest) {
   try {
@@ -62,8 +61,8 @@ export async function POST(req: NextRequest) {
         name,
         canvasBaseUrl: canvasUrl,
         canvasAccessTokenEncrypted: encrypt(pat),
-        canvasRefreshTokenEncrypted: null, // PATs don't have refresh tokens
-        canvasTokenExpiresAt: null, // PATs don't expire
+        canvasRefreshTokenEncrypted: null,
+        canvasTokenExpiresAt: null,
         canvasUserId,
       },
       update: {
@@ -76,10 +75,21 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    return NextResponse.json({
+    // Set session cookie and return success
+    const response = NextResponse.json({
       success: true,
       user: { id: user.id, email: user.email, name: user.name },
     });
+
+    response.cookies.set("canvas_user_email", user.email, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      maxAge: 60 * 60 * 24 * 7, // 7 days
+      path: "/",
+    });
+
+    return response;
   } catch (error) {
     console.error("Canvas PAT auth error:", error);
     return apiError("INTERNAL");

@@ -16,17 +16,33 @@ export interface AuthedUser {
 }
 
 /**
- * Validates the NextAuth session and loads the full user record.
+ * Validates authentication and loads the full user record.
+ * Checks NextAuth session first, then falls back to canvas_user_email cookie.
  * Returns { user, error } — if error is non-null, return it from the route handler.
  */
 export async function requireAuth(): Promise<{ user: AuthedUser; error: null } | { user: null; error: NextResponse }> {
+  // Try NextAuth session first
   const session = await getServerSession(authOptions);
-  if (!session?.user?.email) {
+  let email: string | null | undefined = session?.user?.email;
+
+  // Fall back to canvas_user_email cookie
+  if (!email) {
+    // Dynamically import to get the current request cookies
+    const { headers } = await import("next/headers");
+    const reqHeaders = await headers();
+    const cookieHeader = reqHeaders.get("cookie") || "";
+    const match = cookieHeader.match(/canvas_user_email=([^;]+)/);
+    if (match) {
+      email = decodeURIComponent(match[1]);
+    }
+  }
+
+  if (!email) {
     return { user: null, error: apiError("UNAUTHORIZED") };
   }
 
   const user = await prisma.user.findUnique({
-    where: { email: session.user.email },
+    where: { email },
     select: {
       id: true,
       email: true,
