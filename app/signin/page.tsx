@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { Sparkles, ArrowRight, Loader2, Shield, AlertCircle, Eye, EyeOff } from "lucide-react";
-import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 
 export default function SignInPage() {
@@ -11,7 +10,7 @@ export default function SignInPage() {
   const [pat, setPat] = useState("");
   const [showToken, setShowToken] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [status, setStatus] = useState<"idle" | "verifying" | "signing_in">("idle");
+  const [status, setStatus] = useState<"idle" | "verifying">("idle");
 
   const handleConnect = async () => {
     const url = canvasUrl.trim();
@@ -34,7 +33,6 @@ export default function SignInPage() {
     setError(null);
 
     try {
-      // Step 1: Verify token with Canvas and upsert user in our DB
       const res = await fetch("/api/auth/canvas/pat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -49,19 +47,7 @@ export default function SignInPage() {
         return;
       }
 
-      // Step 2: Create NextAuth session
-      setStatus("signing_in");
-      const result = await signIn("canvas", {
-        email: data.user.email,
-        redirect: false,
-      });
-
-      if (result?.error) {
-        setError("Session creation failed — try again");
-        setStatus("idle");
-        return;
-      }
-
+      // Cookie is set by the server — redirect to dashboard
       router.push("/dashboard");
     } catch {
       setError("Connection error — check your Canvas URL and token");
@@ -144,12 +130,7 @@ export default function SignInPage() {
               {status === "verifying" ? (
                 <>
                   <Loader2 className="w-4 h-4 hud-sync-active" />
-                  <span>VERIFYING TOKEN...</span>
-                </>
-              ) : status === "signing_in" ? (
-                <>
-                  <Loader2 className="w-4 h-4 hud-sync-active" />
-                  <span>SIGNING IN...</span>
+                  <span>VERIFYING...</span>
                 </>
               ) : (
                 <>
