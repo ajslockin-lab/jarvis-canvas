@@ -53,27 +53,50 @@ export async function POST(req: NextRequest) {
     const name = meData.name || "Canvas Student";
     const canvasUserId = String(meData.id);
 
-    // Upsert user with encrypted PAT
-    const user = await prisma.user.upsert({
-      where: { email },
-      create: {
-        email,
-        name,
-        canvasBaseUrl: canvasUrl,
-        canvasAccessTokenEncrypted: encrypt(pat),
-        canvasRefreshTokenEncrypted: null,
-        canvasTokenExpiresAt: null,
-        canvasUserId,
-      },
-      update: {
-        name,
-        canvasBaseUrl: canvasUrl,
-        canvasAccessTokenEncrypted: encrypt(pat),
-        canvasRefreshTokenEncrypted: null,
-        canvasTokenExpiresAt: null,
-        canvasUserId,
-      },
+    // Check if there's already a user with this canvasUserId (from a previous login)
+    const existingByCanvasId = await prisma.user.findFirst({
+      where: { canvasUserId },
     });
+
+    let user;
+    if (existingByCanvasId) {
+      // Update existing user with new token/data, and update email if Canvas returns one
+      user = await prisma.user.update({
+        where: { id: existingByCanvasId.id },
+        data: {
+          name,
+          canvasBaseUrl: canvasUrl,
+          canvasAccessTokenEncrypted: encrypt(pat),
+          canvasRefreshTokenEncrypted: null,
+          canvasTokenExpiresAt: null,
+          canvasUserId,
+          // Update email to the real Canvas email if available
+          ...(meData.email ? { email: meData.email } : {}),
+        },
+      });
+    } else {
+      // New user — create
+      user = await prisma.user.upsert({
+        where: { email },
+        create: {
+          email,
+          name,
+          canvasBaseUrl: canvasUrl,
+          canvasAccessTokenEncrypted: encrypt(pat),
+          canvasRefreshTokenEncrypted: null,
+          canvasTokenExpiresAt: null,
+          canvasUserId,
+        },
+        update: {
+          name,
+          canvasBaseUrl: canvasUrl,
+          canvasAccessTokenEncrypted: encrypt(pat),
+          canvasRefreshTokenEncrypted: null,
+          canvasTokenExpiresAt: null,
+          canvasUserId,
+        },
+      });
+    }
 
     // Set session cookie and return success
     const response = NextResponse.json({
@@ -82,7 +105,7 @@ export async function POST(req: NextRequest) {
     });
 
     response.cookies.set("canvas_user_email", user.email, {
-      httpOnly: true,
+      httpOnly: false,
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
       maxAge: 60 * 60 * 24 * 7, // 7 days

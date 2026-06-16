@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Bell, X, Clock, AlertTriangle, Zap, Sparkles } from "lucide-react";
 
 interface ProactiveAlert {
@@ -15,7 +15,6 @@ interface ProactiveAlert {
 }
 
 interface ProactiveFeedProps {
-  alerts?: ProactiveAlert[];
   maxItems?: number;
 }
 
@@ -26,36 +25,133 @@ const iconFor: Record<string, React.ReactNode> = {
   warning: <AlertTriangle className="w-4 h-4 text-[#FF4D4D]" />,
 };
 
-const defaultAlerts: ProactiveAlert[] = [
-  {
-    id: "1",
-    type: "deadline",
-    title: "BIO LAB APPROACHING",
-    message: "Due tomorrow at 11:59 PM. Estimated time: 3 hours.",
-    action: "#",
-    actionLabel: "START NOW",
-    dismissable: true,
-    urgent: true,
-  },
-  {
-    id: "2",
-    type: "suggestion",
-    title: "FREE WINDOW DETECTED",
-    message: "You have 3 hours free. Perfect time for the History essay due Friday.",
-    action: "#",
-    actionLabel: "PLAN IT",
-    dismissable: true,
-  },
-];
+function generateAlerts(courses: { name: string; assignments: { name: string; dueDate: string | null }[] }[]): ProactiveAlert[] {
+  const now = new Date();
+  const alerts: ProactiveAlert[] = [];
 
-export default function ProactiveFeed({ alerts = defaultAlerts, maxItems = 3 }: ProactiveFeedProps) {
+  // Flatten all upcoming assignments with due dates
+  const allUpcoming = courses.flatMap((c) =>
+    c.assignments
+      .filter((a) => a.dueDate && new Date(a.dueDate) >= now)
+      .map((a) => ({ ...a, courseName: c.name }))
+  ).sort((a, b) => new Date(a.dueDate!).getTime() - new Date(b.dueDate!).getTime());
+
+  // Urgent: due within 24 hours
+  const urgent = allUpcoming.filter((a) => {
+    const hours = (new Date(a.dueDate!).getTime() - now.getTime()) / (1000 * 60 * 60);
+    return hours > 0 && hours < 24;
+  });
+
+  for (const a of urgent.slice(0, 2)) {
+    const hours = Math.ceil((new Date(a.dueDate!).getTime() - now.getTime()) / (1000 * 60 * 60));
+    alerts.push({
+      id: `urgent-${a.name}`,
+      type: "deadline",
+      title: `${a.name.toUpperCase()}`,
+      message: `Due in ${hours}h — ${a.courseName}. Start now to finish on time.`,
+      action: "#",
+      actionLabel: "START NOW",
+      dismissable: true,
+      urgent: true,
+    });
+  }
+
+  // Warning: overdue
+  const overdue = courses.flatMap((c) =>
+    c.assignments
+      .filter((a) => a.dueDate && new Date(a.dueDate) < now)
+      .map((a) => ({ ...a, courseName: c.name }))
+  );
+
+  if (overdue.length > 0) {
+    alerts.push({
+      id: "overdue",
+      type: "warning",
+      title: `${overdue.length} OVERDUE ASSIGNMENT${overdue.length > 1 ? "S" : ""}`,
+      message: `You have ${overdue.length} past-due item${overdue.length > 1 ? "s" : ""}. Check if submissions are still accepted.`,
+      dismissable: true,
+      urgent: true,
+    });
+  }
+
+  // Suggestion: heavy workload day
+  const thisWeek = allUpcoming.filter((a) => {
+    const hours = (new Date(a.dueDate!).getTime() - now.getTime()) / (1000 * 60 * 60);
+    return hours > 0 && hours < 168;
+  });
+
+  if (thisWeek.length >= 3) {
+    alerts.push({
+      id: "workload",
+      type: "suggestion",
+      title: "HEAVY WEEK AHEAD",
+      message: `${thisWeek.length} assignments due this week. Spread them out — start the hardest ones first.`,
+      dismissable: true,
+    });
+  } else if (thisWeek.length > 0 && urgent.length === 0) {
+    // Find free windows — days with no assignments due
+    const firstDue = thisWeek[0];
+    const hoursToFirst = Math.ceil((new Date(firstDue.dueDate!).getTime() - now.getTime()) / (1000 * 60 * 60));
+    if (hoursToFirst > 48) {
+      alerts.push({
+        id: "free-window",
+        type: "suggestion",
+        title: "FREE WINDOW DETECTED",
+        message: `Nothing due for ${Math.round(hoursToFirst / 24)} days. Get ahead on "${firstDue.name}" — due ${new Date(firstDue.dueDate!).toLocaleDateString("en-US", { month: "short", day: "numeric" })}.`,
+        action: "#",
+        actionLabel: "PLAN IT",
+        dismissable: true,
+      });
+    }
+  }
+
+  // Coming up: next assignment
+  if (allUpcoming.length > 0 && urgent.length === 0 && overdue.length === 0) {
+    const next = allUpcoming[0];
+    const days = Math.ceil((new Date(next.dueDate!).getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+    alerts.push({
+      id: "next-up",
+      type: "deadline",
+      title: next.name.toUpperCase(),
+      message: `Due in ${days} day${days > 1 ? "s" : ""} — ${next.courseName}`,
+      dismissable: true,
+    });
+  }
+
+  return alerts.length > 0 ? alerts : [];
+}
+
+export default function ProactiveFeed({ maxItems = 3 }: ProactiveFeedProps) {
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
+  const [alerts, setAlerts] = useState<ProactiveAlert[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch("/api/user/data")
+      .then((r) => r.json())
+      .then((data) => {
+        const courses = Array.isArray(data.courses) ? data.courses : [];
+        setAlerts(generateAlerts(courses));
+      })
+      .catch(() => setAlerts([]))
+      .finally(() => setLoading(false));
+  }, []);
 
   const handleDismiss = (id: string) => {
     setDismissed((prev) => new Set([...prev, id]));
   };
 
   const visibleAlerts = alerts.filter((a) => !dismissed.has(a.id)).slice(0, maxItems);
+
+  if (loading) {
+    return (
+      <div className="space-y-3">
+        {[1, 2].map((i) => (
+          <div key={i} className="h-16 rounded bg-[#0A1520]/50 animate-pulse" />
+        ))}
+      </div>
+    );
+  }
 
   if (visibleAlerts.length === 0) {
     return (
@@ -82,9 +178,9 @@ export default function ProactiveFeed({ alerts = defaultAlerts, maxItems = 3 }: 
               </h4>
               <p className="font-rajdhani text-[13px] text-[#5a7a8a] leading-relaxed">{alert.message}</p>
               {alert.action && alert.actionLabel && (
-                <button className="mt-2 font-mono-data text-[11px] text-[#00B4FF] hover:text-[#00E5FF] font-bold transition tracking-wide">
+                <a href={alert.action} className="mt-2 font-mono-data text-[11px] text-[#00B4FF] hover:text-[#00E5FF] font-bold transition tracking-wide inline-block">
                   {alert.actionLabel}
-                </button>
+                </a>
               )}
             </div>
             {alert.dismissable && (
