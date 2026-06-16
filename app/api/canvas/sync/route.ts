@@ -3,6 +3,7 @@ import { fetchCanvasCourses, fetchCanvasAssignments } from "@/lib/canvas";
 import { fetchEnrollmentsWithGrades } from "@/lib/canvas-grades";
 import { requireAuth, getCanvasToken } from "@/lib/with-auth";
 import { apiError } from "@/lib/errors";
+import { prisma } from "@/lib/prisma";
 
 function computeLetterGrade(score: number | null): string | null {
   if (score === null) return null;

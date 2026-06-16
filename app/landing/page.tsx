@@ -41,7 +41,7 @@ export default function LandingPage() {
         <div className="hidden md:flex items-center gap-8">
           <a href="#features" className="text-sm text-slate-400 hover:text-white transition">Features</a>
           <a href="#how-it-works" className="text-sm text-slate-400 hover:text-white transition">How It Works</a>
-          <Link href="/settings" className="text-sm font-medium text-white bg-white/10 hover:bg-white/20 px-4 py-2 rounded-lg transition border border-white/10">
+          <Link href="/signin" className="text-sm font-medium text-white bg-white/10 hover:bg-white/20 px-4 py-2 rounded-lg transition border border-white/10">
             Open Dashboard →
           </Link>
         </div>
@@ -58,7 +58,7 @@ export default function LandingPage() {
           <div className="flex flex-col gap-6">
             <a href="#features" onClick={() => setMenuOpen(false)} className="text-xl text-slate-300 hover:text-white transition">Features</a>
             <a href="#how-it-works" onClick={() => setMenuOpen(false)} className="text-xl text-slate-300 hover:text-white transition">How It Works</a>
-            <Link href="/settings" onClick={() => setMenuOpen(false)} className="text-xl text-cyan-400 hover:text-cyan-300 transition">Open Dashboard →</Link>
+            <Link href="/signin" onClick={() => setMenuOpen(false)} className="text-xl text-cyan-400 hover:text-cyan-300 transition">Sign In →</Link>
           </div>
         </div>
       )}
@@ -80,7 +80,7 @@ export default function LandingPage() {
             Stop drowning in assignments. JARVIS connects directly to your Canvas, tracks every deadline, reads your modules, and explains anything — all with a voice assistant that feels like talking to a tutor who actually cares.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center mb-16">
-            <Link href="/settings" className="inline-flex items-center justify-center gap-2 px-8 py-4 rounded-xl bg-white text-black font-semibold text-lg hover:bg-slate-200 transition shadow-lg shadow-white/10">
+            <Link href="/signin" className="inline-flex items-center justify-center gap-2 px-8 py-4 rounded-xl bg-white text-black font-semibold text-lg hover:bg-slate-200 transition shadow-lg shadow-white/10">
               Start Your Free Setup <ArrowRight className="w-5 h-5" />
             </Link>
             <button className="inline-flex items-center justify-center gap-2 px-8 py-4 rounded-xl bg-white/5 text-white font-semibold text-lg border border-white/10 hover:bg-white/10 transition">
@@ -222,7 +222,7 @@ export default function LandingPage() {
           <h2 className="text-3xl md:text-5xl font-bold mb-4">Stop Drowning. Start Organized.</h2>
           <p className="text-lg text-slate-400 mb-8">Join students who are already using JARVIS to stay ahead of their Canvas workload.</p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link href="/settings" className="inline-flex items-center justify-center gap-2 px-8 py-4 rounded-xl bg-white text-black font-semibold text-lg hover:bg-slate-200 transition shadow-lg shadow-white/10">
+            <Link href="/signin" className="inline-flex items-center justify-center gap-2 px-8 py-4 rounded-xl bg-white text-black font-semibold text-lg hover:bg-slate-200 transition shadow-lg shadow-white/10">
               Get Free Early Access <ArrowRight className="w-5 h-5" />
             </Link>
             <button className="inline-flex items-center justify-center gap-2 px-8 py-4 rounded-xl bg-white/5 text-white font-semibold text-lg border border-white/10 hover:bg-white/10 transition">

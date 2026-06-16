@@ -1,27 +1,46 @@
 "use client";
 
-import { useState } from "react";
-import { Sparkles, ArrowRight, Loader2, Shield } from "lucide-react";
+import { useState, useMemo } from "react";
+import { useSearchParams } from "next/navigation";
+import { Sparkles, ArrowRight, Loader2, Shield, AlertCircle } from "lucide-react";
+
+const ERROR_MESSAGES: Record<string, string> = {
+  invalid_client: "Canvas doesn't recognize this app. Your school admin needs to register JARVIS in Canvas first.",
+  access_denied: "You denied access to JARVIS. Try again if you want to connect.",
+  token_exchange_failed: "Couldn't get your Canvas token. Try again.",
+  oauth_state_mismatch: "Security check failed. Try again.",
+  canvas_auth_failed: "Canvas connection failed. Check your Canvas URL and try again.",
+};
 
 export default function SignInPage() {
+  const searchParams = useSearchParams();
   const [canvasUrl, setCanvasUrl] = useState("");
-  const [error, setError] = useState<string | null>(null);
+  const [inputError, setInputError] = useState<string | null>(null);
   const [status, setStatus] = useState<"idle" | "submitting">("idle");
+
+  // Derive OAuth error from URL params — no setState in effect needed
+  const oauthError = useMemo(() => {
+    const err = searchParams.get("error");
+    if (!err) return null;
+    return ERROR_MESSAGES[err] || decodeURIComponent(err);
+  }, [searchParams]);
+
+  const error = oauthError || inputError;
 
   const handleConnect = async () => {
     const url = canvasUrl.trim();
     if (!url) {
-      setError("Enter your Canvas URL");
+      setInputError("Enter your Canvas URL");
       return;
     }
 
     if (!url.match(/^https?:\/\/[a-z0-9-]+\.instructure\.com$/)) {
-      setError("Must be a valid Canvas URL (e.g., https://school.instructure.com)");
+      setInputError("Must be a valid Canvas URL (e.g., https://school.instructure.com)");
       return;
     }
 
     setStatus("submitting");
-    setError(null);
+    setInputError(null);
 
     try {
       const res = await fetch("/api/auth/canvas/start", {
@@ -32,14 +51,13 @@ export default function SignInPage() {
 
       const data = await res.json();
       if (data.url) {
-        // Redirect to Canvas OAuth
         window.location.href = data.url;
       } else {
-        setError(data.error || "Failed to connect to Canvas");
+        setInputError(data.error || "Failed to connect to Canvas");
         setStatus("idle");
       }
     } catch {
-      setError("Connection error — check your Canvas URL");
+      setInputError("Connection error — check your Canvas URL");
       setStatus("idle");
     }
   };
@@ -81,7 +99,7 @@ export default function SignInPage() {
                 value={canvasUrl}
                 onChange={(e) => {
                   setCanvasUrl(e.target.value);
-                  setError(null);
+                  setInputError(null);
                 }}
                 placeholder="https://school.instructure.com"
                 className="w-full px-4 py-3 bg-[#0A1520] border border-[#00B4FF]/20 text-[#e8f4f8] font-mono text-[13px] placeholder:text-[#5a7a8a]/50 focus:border-[#00B4FF]/50 focus:outline-none transition"
@@ -109,7 +127,10 @@ export default function SignInPage() {
             </button>
 
             {error && (
-              <p className="font-rajdhani text-[12px] text-[#FF9500] text-center">{error}</p>
+              <div className="flex items-start gap-2 p-3 bg-[#FF9500]/10 border border-[#FF9500]/20">
+                <AlertCircle className="w-4 h-4 text-[#FF9500] mt-0.5 shrink-0" />
+                <p className="font-rajdhani text-[12px] text-[#FF9500]">{error}</p>
+              </div>
             )}
           </div>
 
@@ -123,9 +144,18 @@ export default function SignInPage() {
           </div>
         </div>
 
-        <p className="text-center font-rajdhani text-[11px] text-[#5a7a8a] mt-6">
-          Don't have a Canvas account? Ask your school for access.
-        </p>
+        {/* Setup note for first-time users */}
+        <div className="hud-panel p-4 mt-4">
+          <p className="font-orbitron text-[10px] font-bold tracking-[0.1em] text-[#5a7a8a] mb-2">
+            FIRST TIME?
+          </p>
+          <p className="font-rajdhani text-[11px] text-[#5a7a8a] leading-relaxed">
+            Your school's Canvas admin needs to register JARVIS as an OAuth app in Canvas.
+            Go to <span className="text-[#00B4FF]">Canvas Settings → API Developer Keys</span> and
+            create a key with the redirect URI:{" "}
+            <span className="font-mono text-[#00E5FF]">[your-app-url]/api/auth/canvas</span>
+          </p>
+        </div>
       </div>
     </div>
   );
