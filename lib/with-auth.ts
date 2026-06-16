@@ -3,6 +3,7 @@ import { authOptions } from "./auth";
 import { apiError } from "./errors";
 import { prisma } from "./prisma";
 import { NextResponse } from "next/server";
+import { cookies } from "next/headers";
 
 export interface AuthedUser {
   id: string;
@@ -21,19 +22,26 @@ export interface AuthedUser {
  * Returns { user, error } — if error is non-null, return it from the route handler.
  */
 export async function requireAuth(): Promise<{ user: AuthedUser; error: null } | { user: null; error: NextResponse }> {
+  let email: string | undefined | null = null;
+
   // Try NextAuth session first
-  const session = await getServerSession(authOptions);
-  let email: string | null | undefined = session?.user?.email;
+  try {
+    const session = await getServerSession(authOptions);
+    email = session?.user?.email;
+  } catch {
+    // NextAuth might fail in edge cases — fall through to cookie
+  }
 
   // Fall back to canvas_user_email cookie
   if (!email) {
-    // Dynamically import to get the current request cookies
-    const { headers } = await import("next/headers");
-    const reqHeaders = await headers();
-    const cookieHeader = reqHeaders.get("cookie") || "";
-    const match = cookieHeader.match(/canvas_user_email=([^;]+)/);
-    if (match) {
-      email = decodeURIComponent(match[1]);
+    try {
+      const cookieStore = await cookies();
+      const cookie = cookieStore.get("canvas_user_email");
+      if (cookie?.value) {
+        email = decodeURIComponent(cookie.value);
+      }
+    } catch {
+      // cookies() might not be available in all contexts
     }
   }
 
