@@ -1,11 +1,11 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/with-auth";
 import { apiError } from "@/lib/errors";
 import { prisma } from "@/lib/prisma";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
-    const { user, error: authError } = await requireAuth();
+    const { user, error: authError } = await requireAuth(req);
     if (authError) return authError;
 
     const fullUser = await prisma.user.findUnique({

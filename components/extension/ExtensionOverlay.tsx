@@ -25,6 +25,39 @@ interface Grade {
 export default function ExtensionOverlay() {
   const [pos, setPos] = useState({ x: 0, y: 0 });
   const [mounted, setMounted] = useState(false);
+  const [authEmail, setAuthEmail] = useState<string | null>(null);
+
+  // Resolve auth email from BroadcastChannel, document.cookie, or URL param
+  useEffect(() => {
+    // Try reading from document.cookie (works in same-site iframe contexts)
+    const cookieMatch = document.cookie.match(/(?:^|;\s*)canvas_user_email=([^;]*)/);
+    if (cookieMatch) {
+      setAuthEmail(decodeURIComponent(cookieMatch[1]));
+    }
+
+    // Try URL param (content script can pass email when opening iframe)
+    const params = new URLSearchParams(window.location.search);
+    const emailParam = params.get("email");
+    if (emailParam) {
+      setAuthEmail(decodeURIComponent(emailParam));
+    }
+
+    // Listen for auth broadcasts from other tabs on the same origin
+    // (signin page, dashboard) — works even in cross-site iframe contexts
+    const channel = new BroadcastChannel("jarvis-auth");
+    channel.onmessage = (event) => {
+      if (event.data?.type === "auth-success" && event.data.email) {
+        setAuthEmail(event.data.email);
+      }
+    };
+    return () => channel.close();
+  }, []);
+
+  // Build auth headers for API calls (always returns a valid Record<string, string>)
+  const authHeaders = useCallback((): Record<string, string> => {
+    if (!authEmail) return {};
+    return { "X-Auth-Email": encodeURIComponent(authEmail) };
+  }, [authEmail]);
 
   // Set initial position client-side to avoid hydration mismatch
   useEffect(() => {
@@ -51,9 +84,14 @@ export default function ExtensionOverlay() {
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
   const [authed, setAuthed] = useState(false);
 
-  useEffect(() => {
-    // Fetch user data (courses + assignments)
-    fetch("/api/user/data")
+  // Fetch data — if authEmail is set, use the X-Auth-Email header;
+  // otherwise try without headers (cookies may work in same-site contexts)
+  const fetchData = useCallback((useAuthHeader = true) => {
+    setLoading(true);
+    const headers = useAuthHeader && authEmail
+      ? { "X-Auth-Email": encodeURIComponent(authEmail) } as Record<string, string>
+      : {};
+    fetch("/api/user/data", { headers })
       .then((r) => {
         if (r.status === 401) {
           setAuthed(false);
@@ -66,12 +104,13 @@ export default function ExtensionOverlay() {
         if (!data) return;
         const c = Array.isArray(data.courses) ? data.courses : [];
         setCourses(c as Course[]);
+        // Capture email from response for subsequent requests
+        if (data.user?.email) setAuthEmail(data.user.email);
       })
       .catch(() => setCourses([]))
       .finally(() => setLoading(false));
 
-    // Fetch grades
-    fetch("/api/canvas/grades")
+    fetch("/api/canvas/grades", { headers })
       .then((r) => r.json())
       .then((data) => {
         if (Array.isArray(data.grades)) {
@@ -84,7 +123,18 @@ export default function ExtensionOverlay() {
         }
       })
       .catch(() => setGrades([]));
-  }, []);
+  }, [authEmail]);
+
+  // On mount: try cookie-based auth first (no auth header)
+  useEffect(() => {
+    fetchData(false);
+  }, [fetchData]);
+
+  // When authEmail arrives (via BroadcastChannel or cookie read), refetch with header
+  useEffect(() => {
+    if (authEmail) fetchData(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authEmail]);
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     setDragOffset({ x: e.clientX - pos.x, y: e.clientY - pos.y });
@@ -140,7 +190,7 @@ export default function ExtensionOverlay() {
     try {
       const res = await fetch("/api/voice/command", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...authHeaders() },
         body: JSON.stringify({ text: textPrompt }),
       });
       const data = await res.json();
@@ -180,38 +230,18 @@ export default function ExtensionOverlay() {
 
   // Not signed in — show connect prompt
   if (!authed && !loading) {
-    // Open signin in a new tab, then poll for auth cookie
     const handleConnect = () => {
       window.open("/signin", "_blank");
-      // Poll every 2s to see if user has authenticated
+      // Poll every 2s for auth — use header-based auth as fallback for cross-site contexts
       const interval = setInterval(() => {
-        fetch("/api/user/data")
+        const headers: Record<string, string> = authEmail
+          ? { "X-Auth-Email": encodeURIComponent(authEmail) }
+          : {};
+        fetch("/api/user/data", { headers })
           .then((r) => {
             if (r.status !== 401) {
               clearInterval(interval);
-              setAuthed(true);
-              setLoading(true);
-              // Re-fetch data
-              fetch("/api/user/data")
-                .then((res) => res.json())
-                .then((data) => {
-                  const c = Array.isArray(data.courses) ? data.courses : [];
-                  setCourses(c as Course[]);
-                })
-                .finally(() => setLoading(false));
-              fetch("/api/canvas/grades")
-                .then((r) => r.json())
-                .then((data) => {
-                  if (Array.isArray(data.grades)) {
-                    setGrades(
-                      data.grades.map((g: { name: string; currentScore: number | null }) => ({
-                        name: g.name,
-                        percent: g.currentScore ?? 0,
-                      }))
-                    );
-                  }
-                })
-                .catch(() => {});
+              fetchData(true);
             }
           })
           .catch(() => {});

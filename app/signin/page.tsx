@@ -47,6 +47,14 @@ export default function SignInPage() {
         return;
       }
 
+      // Broadcast auth success so the extension iframe picks it up via BroadcastChannel
+      const authEmail = data.user?.email;
+      if (authEmail) {
+        const channel = new BroadcastChannel("jarvis-auth");
+        channel.postMessage({ type: "auth-success", email: authEmail });
+        channel.close();
+      }
+
       // Cookie is set by the server — redirect to dashboard
       router.push("/dashboard");
     } catch {

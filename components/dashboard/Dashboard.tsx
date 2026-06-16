@@ -45,6 +45,18 @@ export default function Dashboard() {
       const res = await fetch("/api/user/data");
       const data = await res.json();
 
+      // Broadcast auth to extension iframe so it can authenticate too
+      const userEmail = data.user?.email;
+      if (userEmail) {
+        try {
+          const channel = new BroadcastChannel("jarvis-auth");
+          channel.postMessage({ type: "auth-success", email: userEmail });
+          channel.close();
+        } catch {
+          // BroadcastChannel not available in some contexts
+        }
+      }
+
       const syncedCourses = Array.isArray(data.courses) ? (data.courses as Course[]) : [];
       if (syncedCourses.length > 0) {
         setCourses(syncedCourses.map((c) => ({ ...c, code: c.code, color: c.color })));

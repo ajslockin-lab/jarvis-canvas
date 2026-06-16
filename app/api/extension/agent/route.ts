@@ -195,7 +195,7 @@ function planAction(command: string, context: PageContext): AgentPlan {
 
 export async function POST(req: NextRequest) {
   try {
-    const { error: authError } = await requireAuth();
+    const { error: authError } = await requireAuth(req);
     if (authError) return authError;
 
     const body = await req.json();
