@@ -45,6 +45,7 @@ export default function AssignmentCard({
       const res = await fetch("/api/canvas/assignments/toggle", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({ assignmentId: id, completed: newCompleted }),
       });
       if (!res.ok) {

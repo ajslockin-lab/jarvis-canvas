@@ -28,6 +28,7 @@ export default function SignInPage() {
       const res = await fetch("/api/auth/canvas/pat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({ canvasUrl: url, pat: token }),
       });
 
@@ -39,11 +40,11 @@ export default function SignInPage() {
         return;
       }
 
-      const authEmail = data.user?.email;
-      if (authEmail) {
+      if (data.sessionToken) {
         try {
+          localStorage.setItem("jarvis_session_token", data.sessionToken);
           const channel = new BroadcastChannel("jarvis-auth");
-          channel.postMessage({ type: "auth-success", email: authEmail });
+          channel.postMessage({ type: "auth-success", sessionToken: data.sessionToken });
           channel.close();
         } catch { /* ignore */ }
       }
