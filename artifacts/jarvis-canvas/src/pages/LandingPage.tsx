@@ -1,6 +1,9 @@
 import { useEffect, useState } from "react";
-import { Sparkles, ArrowRight, Zap, Calendar, BookOpen, Mic, Check } from "lucide-react";
+import { Sparkles, ArrowRight, Zap, Calendar, BookOpen, Mic, Check, Smartphone } from "lucide-react";
 import { Link } from "wouter";
+
+const MOBILE_APP_URL =
+  import.meta.env.VITE_CARVIS_MOBILE_URL || "https://pwajarvismobile.replit.app";
 
 export default function LandingPage() {
   const [scrolled, setScrolled] = useState(false);
@@ -36,6 +39,10 @@ export default function LandingPage() {
         <div className="hidden md:flex items-center gap-8">
           <a href="#features" className="text-sm text-slate-400 hover:text-white transition">Features</a>
           <a href="#how-it-works" className="text-sm text-slate-400 hover:text-white transition">How It Works</a>
+          <a href="#mobile-app" className="text-sm text-slate-400 hover:text-white transition">Mobile App</a>
+          <a href={MOBILE_APP_URL} target="_blank" rel="noopener noreferrer" className="text-sm font-medium text-[#FF4444] border border-[#FF4444]/30 hover:bg-[#FF4444]/10 px-4 py-2 rounded-lg transition">
+            Get Mobile App
+          </a>
           <Link href="/signin" className="text-sm font-medium text-white bg-white/10 hover:bg-white/20 px-4 py-2 rounded-lg transition border border-white/10">
             Open Dashboard →
           </Link>
@@ -53,6 +60,8 @@ export default function LandingPage() {
           <div className="flex flex-col gap-6">
             <a href="#features" onClick={() => setMenuOpen(false)} className="text-xl text-slate-300 hover:text-white transition">Features</a>
             <a href="#how-it-works" onClick={() => setMenuOpen(false)} className="text-xl text-slate-300 hover:text-white transition">How It Works</a>
+            <a href="#mobile-app" onClick={() => setMenuOpen(false)} className="text-xl text-slate-300 hover:text-white transition">Mobile App</a>
+            <a href={MOBILE_APP_URL} target="_blank" rel="noopener noreferrer" onClick={() => setMenuOpen(false)} className="text-xl text-[#FF4444] hover:text-[#ff6b3d] transition">Get Mobile App →</a>
             <Link href="/signin" onClick={() => setMenuOpen(false)} className="text-xl text-[#FF4444] hover:text-[#ff6b3d] transition">Sign In →</Link>
           </div>
         </div>
@@ -168,6 +177,64 @@ export default function LandingPage() {
                 <p className="font-rajdhani text-[13px] text-[rgba(245,245,245,0.4)] leading-relaxed">{s.desc}</p>
               </div>
             ))}
+          </div>
+        </div>
+      </section>
+
+      <section id="mobile-app" className="py-24 px-6 bg-[rgba(255,30,30,0.03)] border-y border-[rgba(160,21,21,0.12)]">
+        <div className="max-w-4xl mx-auto fade-in">
+          <div className="grid md:grid-cols-2 gap-10 items-center">
+            <div>
+              <div className="text-xs font-bold tracking-[0.3em] text-[#FF4444] uppercase mb-4">Mobile PWA</div>
+              <h2 className="text-4xl font-extrabold text-white mb-4">
+                CARVIS in Your <span className="text-[#FF6B3D]">Pocket</span>
+              </h2>
+              <p className="text-slate-400 leading-relaxed mb-6">
+                Install the CARVIS mobile app on your phone for voice commands, deadline alerts, and grades on the go. Same Canvas sync — optimized for touch and offline-friendly PWA install.
+              </p>
+              <ul className="space-y-3 mb-8">
+                {["Bottom-nav mobile dashboard", "Press-and-hold voice orb", "Add to Home Screen (iOS & Android)", "Syncs with your desktop account"].map((item) => (
+                  <li key={item} className="flex items-center gap-2 text-sm text-slate-300">
+                    <Check className="w-4 h-4 text-[#FF4444] shrink-0" />
+                    {item}
+                  </li>
+                ))}
+              </ul>
+              <a
+                href={MOBILE_APP_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center justify-center gap-2 px-8 py-4 rounded-xl bg-[#FF4444] text-white font-semibold text-lg hover:bg-[#ff6b3d] transition shadow-lg shadow-[#FF4444]/20"
+              >
+                <Smartphone className="w-5 h-5" />
+                Open Mobile App
+              </a>
+            </div>
+            <div className="hud-panel p-6 max-w-xs mx-auto md:ml-auto">
+              <span className="corner-br" />
+              <div className="rounded-2xl border border-[rgba(160,21,21,0.2)] bg-black/60 p-4 space-y-3">
+                <div className="flex items-center gap-2 pb-3 border-b border-[rgba(160,21,21,0.15)]">
+                  <img src="/carvis-logo.png" alt="" className="h-6 w-6 object-contain" />
+                  <span className="font-orbitron text-xs font-bold text-[#FF4444] tracking-wider">CARVIS</span>
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-center">
+                  <div className="rounded-lg bg-[rgba(255,30,30,0.08)] p-3">
+                    <div className="font-mono-data text-2xl font-bold text-[#FF9500]">3</div>
+                    <div className="text-[9px] text-slate-500 uppercase tracking-wider">Due Today</div>
+                  </div>
+                  <div className="rounded-lg bg-[rgba(255,30,30,0.08)] p-3">
+                    <div className="font-mono-data text-2xl font-bold text-[#FF4444]">12</div>
+                    <div className="text-[9px] text-slate-500 uppercase tracking-wider">This Week</div>
+                  </div>
+                </div>
+                <div className="flex justify-center pt-2">
+                  <div className="w-14 h-14 rounded-full border-2 border-[#FF4444] bg-[rgba(255,30,30,0.12)] flex items-center justify-center shadow-[0_0_24px_rgba(255,68,68,0.35)]">
+                    <Mic className="w-6 h-6 text-[#FF4444]" />
+                  </div>
+                </div>
+                <p className="text-center text-[10px] text-slate-500 tracking-wide">Hold to speak</p>
+              </div>
+            </div>
           </div>
         </div>
       </section>

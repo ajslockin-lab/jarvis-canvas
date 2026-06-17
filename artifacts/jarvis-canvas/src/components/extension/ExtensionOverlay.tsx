@@ -323,26 +323,26 @@ export default function ExtensionOverlay() {
       <div className="pointer-events-auto w-[360px] rounded-2xl border border-[rgba(160,21,21,0.3)] bg-black/97 backdrop-blur-xl shadow-[0_0_40px_rgba(255,30,30,0.12),inset_0_1px_0_rgba(255,68,68,0.08)] overflow-hidden">
 
         {/* Header */}
-        <div className="px-4 py-3 flex items-center justify-between border-b border-cyan-400/15 bg-gradient-to-r from-cyan-500/5 to-blue-500/5">
+        <div className="px-4 py-3 flex items-center justify-between border-b border-[rgba(160,21,21,0.18)] bg-gradient-to-r from-[rgba(255,30,30,0.06)] to-transparent">
           <div className="flex items-center gap-2.5">
-            <div className="relative w-7 h-7 rounded-full border border-cyan-400/50 bg-cyan-500/10 flex items-center justify-center">
-              <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
-              <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-cyan-400 shadow-[0_0_6px_rgba(6,182,212,0.8)]" />
+            <div className="relative w-7 h-7 rounded-full border border-[rgba(255,68,68,0.45)] bg-[rgba(255,30,30,0.1)] flex items-center justify-center">
+              <img src="/carvis-logo.png" alt="" className="h-4 w-4 object-contain" />
+              <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-[#FF4444] shadow-[0_0_6px_rgba(255,68,68,0.55)]" />
             </div>
             <div>
-              <p className="font-orbitron text-[11px] font-bold tracking-[0.15em] text-cyan-300">CARVIS</p>
-              <p className="text-[9px] text-cyan-400/50 tracking-wider">CANVAS AGENT // ONLINE</p>
+              <p className="font-orbitron text-[11px] font-bold tracking-[0.15em] text-[#FF4444]">CARVIS</p>
+              <p className="text-[9px] text-[rgba(255,68,68,0.5)] tracking-wider">CANVAS AGENT // ONLINE</p>
             </div>
           </div>
           <div className="flex items-center gap-1.5">
             {lastAction && (
-              <span className="flex items-center gap-1 px-2 py-0.5 rounded-full border border-cyan-400/20 bg-cyan-500/10 text-[9px] text-cyan-300/70 font-mono">
+              <span className="flex items-center gap-1 px-2 py-0.5 rounded-full border border-[rgba(160,21,21,0.22)] bg-[rgba(255,30,30,0.1)] text-[9px] text-[rgba(255,68,68,0.75)] font-mono">
                 {actionIconMap[lastAction.type]}
                 {lastAction.label}
               </span>
             )}
             <button onClick={toggleVoice} title="Voice command"
-              className={`w-7 h-7 rounded-full border flex items-center justify-center transition ${isListening ? "border-red-400/60 bg-red-500/10 text-red-400" : "border-cyan-400/30 bg-cyan-500/5 text-cyan-400/70 hover:text-cyan-400 hover:border-cyan-400/50"}`}>
+              className={`w-7 h-7 rounded-full border flex items-center justify-center transition ${isListening ? "border-red-400/60 bg-red-500/10 text-red-400" : "border-[rgba(255,68,68,0.3)] bg-[rgba(255,30,30,0.06)] text-[rgba(255,68,68,0.7)] hover:text-[#FF4444] hover:border-[rgba(255,68,68,0.5)]"}`}>
               <Mic className="w-3.5 h-3.5" />
             </button>
             <button onClick={closePanel} className="w-7 h-7 rounded-full border border-[rgba(160,21,21,0.25)] flex items-center justify-center text-[rgba(255,68,68,0.5)] hover:text-[#FF4444] hover:border-[#FF4444]/40 transition">
@@ -352,10 +352,10 @@ export default function ExtensionOverlay() {
         </div>
 
         {/* Tabs */}
-        <div className="flex border-b border-cyan-400/10">
+        <div className="flex border-b border-[rgba(160,21,21,0.14)]">
           {([["intel", "INTEL", <Eye key="e" className="w-3 h-3" />], ["agent", "AGENT", <Cpu key="c" className="w-3 h-3" />], ["data", "DATA", <Zap key="z" className="w-3 h-3" />]] as [Tab, string, React.ReactNode][]).map(([id, label, icon]) => (
             <button key={id} onClick={() => setTab(id)}
-              className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 text-[10px] font-bold tracking-[0.1em] transition border-b-2 ${tab === id ? "text-cyan-300 border-cyan-400 bg-cyan-500/5" : "text-cyan-400/40 border-transparent hover:text-cyan-400/60 hover:bg-cyan-500/3"}`}>
+              className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 text-[10px] font-bold tracking-[0.1em] transition border-b-2 ${tab === id ? "text-[#FF4444] border-[#FF4444] bg-[rgba(255,30,30,0.08)]" : "text-[rgba(255,68,68,0.4)] border-transparent hover:text-[rgba(255,68,68,0.75)] hover:bg-[rgba(255,30,30,0.05)]"}`}>
               {icon}{label}
             </button>
           ))}
@@ -368,16 +368,16 @@ export default function ExtensionOverlay() {
           {tab === "intel" && (
             <div className="p-3 space-y-3">
               {/* Calendar */}
-              <div className="rounded-xl border border-cyan-400/20 bg-cyan-950/20 p-3">
+              <div className="rounded-xl border border-[rgba(160,21,21,0.22)] bg-[rgba(255,30,30,0.05)] p-3">
                 <div className="flex items-center justify-between mb-2.5">
-                  <button onClick={() => setCalDate(new Date(calDate.getFullYear(), calDate.getMonth() - 1))} className="text-cyan-400/50 hover:text-cyan-400 transition"><ChevronLeft className="w-3.5 h-3.5" /></button>
-                  <span className="font-orbitron text-[10px] font-bold tracking-widest text-cyan-300/70">
+                  <button onClick={() => setCalDate(new Date(calDate.getFullYear(), calDate.getMonth() - 1))} className="text-[rgba(255,68,68,0.5)] hover:text-[#FF4444] transition"><ChevronLeft className="w-3.5 h-3.5" /></button>
+                  <span className="font-orbitron text-[10px] font-bold tracking-widest text-[rgba(255,68,68,0.75)]">
                     {calDate.toLocaleString("en-US", { month: "short", year: "numeric" }).toUpperCase()}
                   </span>
-                  <button onClick={() => setCalDate(new Date(calDate.getFullYear(), calDate.getMonth() + 1))} className="text-cyan-400/50 hover:text-cyan-400 transition"><ChevronRight className="w-3.5 h-3.5" /></button>
+                  <button onClick={() => setCalDate(new Date(calDate.getFullYear(), calDate.getMonth() + 1))} className="text-[rgba(255,68,68,0.5)] hover:text-[#FF4444] transition"><ChevronRight className="w-3.5 h-3.5" /></button>
                 </div>
                 <div className="grid grid-cols-7 gap-0.5 text-center mb-1">
-                  {dayNames.map((d, i) => <span key={i} className="text-[9px] text-cyan-400/30 font-bold">{d}</span>)}
+                  {dayNames.map((d, i) => <span key={i} className="text-[9px] text-[rgba(255,68,68,0.35)] font-bold">{d}</span>)}
                 </div>
                 <div className="grid grid-cols-7 gap-0.5">
                   {days.map((day, i) => {
@@ -387,22 +387,22 @@ export default function ExtensionOverlay() {
                     const isSel = selectedDay === day;
                     return (
                       <button key={i} onClick={() => day && setSelectedDay(isSel ? null : day)}
-                        className={`h-7 flex items-center justify-center rounded text-[11px] relative transition ${!day ? "cursor-default" : ""} ${isToday ? "bg-cyan-500/25 border border-cyan-400/50 text-white font-bold" : isSel ? "ring-1 ring-cyan-400 text-cyan-200" : hasA ? "text-cyan-300 font-semibold hover:bg-cyan-500/10" : "text-cyan-400/25"}`}>
+                        className={`h-7 flex items-center justify-center rounded text-[11px] relative transition ${!day ? "cursor-default" : ""} ${isToday ? "bg-[rgba(255,30,30,0.18)] border border-[rgba(255,68,68,0.45)] text-white font-bold" : isSel ? "ring-1 ring-[#FF4444] text-[#f5f5f5]" : hasA ? "text-[#FF4444] font-semibold hover:bg-[rgba(255,30,30,0.08)]" : "text-[rgba(255,68,68,0.3)]"}`}>
                         {day || ""}
-                        {hasA && <span className="absolute bottom-0.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-cyan-400/80" />}
+                        {hasA && <span className="absolute bottom-0.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-[#FF4444]/80" />}
                       </button>
                     );
                   })}
                 </div>
                 {selectedDay && getAssignmentsForDay(selectedDay).length > 0 && (
-                  <div className="mt-2 pt-2 border-t border-cyan-400/10 space-y-1.5">
+                  <div className="mt-2 pt-2 border-t border-[rgba(160,21,21,0.14)] space-y-1.5">
                     {getAssignmentsForDay(selectedDay).map((a) => (
                       <a key={a.id} href={a.url || "#"} target="_blank" rel="noopener noreferrer"
-                        className="flex items-start gap-2 p-1.5 rounded border border-cyan-400/15 hover:border-cyan-400/30 transition">
-                        <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 mt-1 shrink-0" />
+                        className="flex items-start gap-2 p-1.5 rounded border border-[rgba(160,21,21,0.18)] hover:border-[rgba(255,68,68,0.35)] transition">
+                        <span className="w-1.5 h-1.5 rounded-full bg-[#FF4444] mt-1 shrink-0" />
                         <div>
-                          <p className="text-[11px] font-semibold text-cyan-100 leading-tight">{a.name}</p>
-                          <p className="text-[9px] text-cyan-400/50">{a.courseName}</p>
+                          <p className="text-[11px] font-semibold text-[#f5f5f5] leading-tight">{a.name}</p>
+                          <p className="text-[9px] text-[rgba(255,68,68,0.5)]">{a.courseName}</p>
                         </div>
                       </a>
                     ))}
@@ -412,9 +412,9 @@ export default function ExtensionOverlay() {
 
               {/* Upcoming */}
               <div>
-                <p className="text-[9px] font-bold tracking-[0.15em] text-cyan-400/40 mb-2 uppercase">Upcoming Targets</p>
+                <p className="text-[9px] font-bold tracking-[0.15em] text-[rgba(255,68,68,0.4)] mb-2 uppercase">Upcoming Targets</p>
                 {loading ? (
-                  <div className="space-y-1.5">{[1,2,3].map(i => <div key={i} className="h-9 rounded-lg bg-cyan-500/5 animate-pulse" />)}</div>
+                  <div className="space-y-1.5">{[1,2,3].map(i => <div key={i} className="h-9 rounded-lg bg-[rgba(255,30,30,0.06)] animate-pulse" />)}</div>
                 ) : allAssignments.slice(0, 4).length > 0 ? (
                   <div className="space-y-1.5">
                     {allAssignments.slice(0, 4).map((a) => {
@@ -423,13 +423,13 @@ export default function ExtensionOverlay() {
                       const overdue = hours !== null && hours < 0;
                       return (
                         <a key={a.id} href={a.url || "#"} target="_blank" rel="noopener noreferrer"
-                          className={`flex items-center gap-2.5 p-2 rounded-lg border transition ${overdue ? "border-red-400/25 bg-red-950/20" : urgent ? "border-amber-400/25 bg-amber-950/20" : "border-cyan-400/15 bg-cyan-950/10 hover:border-cyan-400/30"}`}>
-                          <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${overdue ? "bg-red-400" : urgent ? "bg-amber-400 shadow-[0_0_6px_rgba(251,191,36,0.6)]" : "bg-cyan-400/50"}`} />
+                          className={`flex items-center gap-2.5 p-2 rounded-lg border transition ${overdue ? "border-red-400/25 bg-red-950/20" : urgent ? "border-amber-400/25 bg-amber-950/20" : "border-[rgba(160,21,21,0.18)] bg-[rgba(255,30,30,0.04)] hover:border-[rgba(255,68,68,0.35)]"}`}>
+                          <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${overdue ? "bg-red-400" : urgent ? "bg-amber-400 shadow-[0_0_6px_rgba(251,191,36,0.6)]" : "bg-[#FF4444]/50"}`} />
                           <div className="flex-1 min-w-0">
-                            <p className="text-[11px] font-semibold text-cyan-100 truncate">{a.name}</p>
-                            <p className="text-[9px] text-cyan-400/50 truncate">{a.courseName}</p>
+                            <p className="text-[11px] font-semibold text-[#f5f5f5] truncate">{a.name}</p>
+                            <p className="text-[9px] text-[rgba(255,68,68,0.5)] truncate">{a.courseName}</p>
                           </div>
-                          <span className={`text-[9px] font-mono shrink-0 ${overdue ? "text-red-400" : urgent ? "text-amber-400" : "text-cyan-400/60"}`}>
+                          <span className={`text-[9px] font-mono shrink-0 ${overdue ? "text-red-400" : urgent ? "text-amber-400" : "text-[rgba(255,68,68,0.55)]"}`}>
                             {overdue ? `${Math.abs(hours!)}h OD` : urgent ? `${hours}h` : a.dueDate ? new Date(a.dueDate).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : ""}
                           </span>
                         </a>
@@ -437,7 +437,7 @@ export default function ExtensionOverlay() {
                     })}
                   </div>
                 ) : (
-                  <p className="text-[11px] text-cyan-400/40 text-center py-3">All clear — no upcoming deadlines</p>
+                  <p className="text-[11px] text-[rgba(255,68,68,0.4)] text-center py-3">All clear — no upcoming deadlines</p>
                 )}
               </div>
             </div>
@@ -447,18 +447,18 @@ export default function ExtensionOverlay() {
           {tab === "agent" && (
             <div className="flex flex-col h-[460px]">
               {/* Context bar */}
-              <div className="px-3 py-1.5 border-b border-cyan-400/10 flex items-center gap-1.5">
+              <div className="px-3 py-1.5 border-b border-[rgba(160,21,21,0.14)] flex items-center gap-1.5">
                 {pageContext && (
                   <>
-                    <Eye className="w-3 h-3 text-cyan-400/40 shrink-0" />
-                    <span className="text-[9px] text-cyan-400/50 truncate font-mono flex-1">{pageContext.title || pageContext.url}</span>
+                    <Eye className="w-3 h-3 text-[rgba(255,68,68,0.4)] shrink-0" />
+                    <span className="text-[9px] text-[rgba(255,68,68,0.5)] truncate font-mono flex-1">{pageContext.title || pageContext.url}</span>
                   </>
                 )}
                 {!pageContext && <span className="flex-1" />}
                 <button
                   onClick={() => { setTtsEnabled((v) => !v); if (ttsEnabled) window.speechSynthesis?.cancel(); }}
                   title={ttsEnabled ? "Mute CARVIS voice" : "Unmute CARVIS voice"}
-                  className={`w-6 h-6 rounded flex items-center justify-center border transition shrink-0 ${ttsEnabled ? "border-cyan-400/40 bg-cyan-500/10 text-cyan-400" : "border-cyan-400/15 text-cyan-400/30 hover:text-cyan-400/50"}`}
+                  className={`w-6 h-6 rounded flex items-center justify-center border transition shrink-0 ${ttsEnabled ? "border-[rgba(255,68,68,0.4)] bg-[rgba(255,30,30,0.1)] text-[rgba(255,68,68,0.65)]" : "border-[rgba(160,21,21,0.18)] text-[rgba(255,68,68,0.35)] hover:text-[#FF4444]/50"}`}
                 >
                   {ttsEnabled ? <Volume2 className="w-3 h-3" /> : <VolumeX className="w-3 h-3" />}
                 </button>
@@ -468,15 +468,15 @@ export default function ExtensionOverlay() {
               <div className="flex-1 overflow-y-auto p-3 space-y-2.5">
                 {agentHistory.length === 0 && (
                   <div className="text-center py-8">
-                    <div className="w-12 h-12 mx-auto mb-3 rounded-full border border-cyan-400/20 bg-cyan-500/5 flex items-center justify-center">
-                      <Cpu className="w-6 h-6 text-cyan-400/40" />
+                    <div className="w-12 h-12 mx-auto mb-3 rounded-full border border-[rgba(160,21,21,0.22)] bg-[rgba(255,30,30,0.06)] flex items-center justify-center">
+                      <Cpu className="w-6 h-6 text-[rgba(255,68,68,0.4)]" />
                     </div>
-                    <p className="font-orbitron text-[10px] text-cyan-400/40 tracking-widest mb-1">AGENT MODE</p>
-                    <p className="text-[11px] text-cyan-400/30">Tell CARVIS what to do on this page.</p>
+                    <p className="font-orbitron text-[10px] text-[rgba(255,68,68,0.4)] tracking-widest mb-1">AGENT MODE</p>
+                    <p className="text-[11px] text-[rgba(255,68,68,0.35)]">Tell CARVIS what to do on this page.</p>
                     <div className="mt-3 space-y-1">
                       {["Open my assignments", "Scroll down", "Go to grades"].map((hint) => (
                         <button key={hint} onClick={() => void sendAgentCommand(hint)}
-                          className="block w-full text-left px-2.5 py-1.5 rounded border border-cyan-400/15 text-[10px] text-cyan-400/50 hover:text-cyan-300 hover:border-cyan-400/30 transition font-mono">
+                          className="block w-full text-left px-2.5 py-1.5 rounded border border-[rgba(160,21,21,0.18)] text-[10px] text-[rgba(255,68,68,0.5)] hover:text-[#ff6b3d] hover:border-[rgba(255,68,68,0.35)] transition font-mono">
                           "{hint}"
                         </button>
                       ))}
@@ -487,13 +487,13 @@ export default function ExtensionOverlay() {
                   <div key={i} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
                     {msg.role === "jarvis" ? (
                       <div className="max-w-[85%] space-y-1.5">
-                        <div className={`px-3 py-2 rounded-xl rounded-tl-sm text-[12px] leading-relaxed ${msg.blocked ? "border border-amber-400/30 bg-amber-950/20 text-amber-200" : "border border-cyan-400/20 bg-cyan-950/20 text-cyan-100"}`}>
+                        <div className={`px-3 py-2 rounded-xl rounded-tl-sm text-[12px] leading-relaxed ${msg.blocked ? "border border-amber-400/30 bg-amber-950/20 text-amber-200" : "border border-[rgba(160,21,21,0.22)] bg-[rgba(255,30,30,0.05)] text-[#f5f5f5]"}`}>
                           {msg.text}
                         </div>
                         {msg.action && !msg.blocked && (
                           <div className="flex items-center gap-1.5 px-1">
-                            <span className="text-cyan-400/50">{actionIconMap[msg.action.type]}</span>
-                            <span className="text-[9px] text-cyan-400/50 font-mono">
+                            <span className="text-[rgba(255,68,68,0.5)]">{actionIconMap[msg.action.type]}</span>
+                            <span className="text-[9px] text-[rgba(255,68,68,0.5)] font-mono">
                               {msg.action.type === "scroll" ? `scroll ${msg.action.direction}` : msg.action.type === "navigate" ? `→ ${msg.action.url}` : msg.action.type === "fill" ? `type: "${msg.action.value}"` : "click element"}
                             </span>
                           </div>
@@ -508,9 +508,9 @@ export default function ExtensionOverlay() {
                 ))}
                 {agentLoading && (
                   <div className="flex justify-start">
-                    <div className="px-3 py-2 rounded-xl rounded-tl-sm border border-cyan-400/20 bg-cyan-950/20">
+                    <div className="px-3 py-2 rounded-xl rounded-tl-sm border border-[rgba(160,21,21,0.22)] bg-[rgba(255,30,30,0.05)]">
                       <div className="flex gap-1">
-                        {[0,1,2].map(i => <span key={i} className="w-1.5 h-1.5 rounded-full bg-cyan-400/60 animate-bounce" style={{ animationDelay: `${i * 0.15}s` }} />)}
+                        {[0,1,2].map(i => <span key={i} className="w-1.5 h-1.5 rounded-full bg-[#FF4444]/60 animate-bounce" style={{ animationDelay: `${i * 0.15}s` }} />)}
                       </div>
                     </div>
                   </div>
@@ -519,7 +519,7 @@ export default function ExtensionOverlay() {
               </div>
 
               {/* Input */}
-              <div className="p-3 border-t border-cyan-400/10">
+              <div className="p-3 border-t border-[rgba(160,21,21,0.14)]">
                 <div className="flex gap-2 items-end">
                   <div className="flex-1 relative">
                     <input
@@ -527,16 +527,16 @@ export default function ExtensionOverlay() {
                       onChange={(e) => setAgentInput(e.target.value)}
                       onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void sendAgentCommand(agentInput); } }}
                       placeholder="Tell CARVIS what to do…"
-                      className="w-full px-3 py-2 rounded-lg border border-cyan-400/20 bg-[#050D1A] text-[12px] text-cyan-100 placeholder:text-cyan-400/30 focus:outline-none focus:border-cyan-400/50 transition font-mono"
+                      className="w-full px-3 py-2 rounded-lg border border-[rgba(160,21,21,0.22)] bg-black text-[12px] text-[#f5f5f5] placeholder:text-[rgba(255,68,68,0.35)] focus:outline-none focus:border-[rgba(255,68,68,0.45)] transition font-mono"
                       disabled={agentLoading}
                     />
                   </div>
                   <button onClick={() => void sendAgentCommand(agentInput)} disabled={agentLoading || !agentInput.trim()}
-                    className="w-8 h-8 rounded-lg border border-cyan-400/30 bg-cyan-500/10 flex items-center justify-center text-cyan-400 hover:bg-cyan-500/20 hover:border-cyan-400/50 disabled:opacity-40 transition shrink-0">
+                    className="w-8 h-8 rounded-lg border border-[rgba(255,68,68,0.3)] bg-[rgba(255,30,30,0.1)] flex items-center justify-center text-[rgba(255,68,68,0.65)] hover:bg-[rgba(255,30,30,0.14)] hover:border-[rgba(255,68,68,0.5)] disabled:opacity-40 transition shrink-0">
                     {agentLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Zap className="w-3.5 h-3.5" />}
                   </button>
                   <button onClick={toggleVoice}
-                    className={`w-8 h-8 rounded-lg border flex items-center justify-center transition shrink-0 ${isListening ? "border-red-400/60 bg-red-500/10 text-red-400" : "border-cyan-400/20 bg-cyan-500/5 text-cyan-400/60 hover:text-cyan-400 hover:border-cyan-400/40"}`}>
+                    className={`w-8 h-8 rounded-lg border flex items-center justify-center transition shrink-0 ${isListening ? "border-red-400/60 bg-red-500/10 text-red-400" : "border-[rgba(160,21,21,0.22)] bg-[rgba(255,30,30,0.06)] text-[rgba(255,68,68,0.55)] hover:text-[#FF4444] hover:border-[rgba(255,68,68,0.45)]"}`}>
                     {isListening ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Mic className="w-3.5 h-3.5" />}
                   </button>
                 </div>
@@ -545,7 +545,7 @@ export default function ExtensionOverlay() {
                 <div className="flex gap-1.5 mt-2 flex-wrap">
                   {[{ icon: <ArrowDown className="w-3 h-3" />, label: "Scroll down", cmd: "scroll down" }, { icon: <ArrowUp className="w-3 h-3" />, label: "Scroll up", cmd: "scroll up" }, { icon: <Navigation className="w-3 h-3" />, label: "Assignments", cmd: "open assignments" }, { icon: <Zap className="w-3 h-3" />, label: "Grades", cmd: "open grades" }].map((btn) => (
                     <button key={btn.cmd} onClick={() => void sendAgentCommand(btn.cmd)} disabled={agentLoading}
-                      className="flex items-center gap-1 px-2 py-1 rounded border border-cyan-400/15 text-[9px] text-cyan-400/50 hover:text-cyan-300 hover:border-cyan-400/30 transition disabled:opacity-30">
+                      className="flex items-center gap-1 px-2 py-1 rounded border border-[rgba(160,21,21,0.18)] text-[9px] text-[rgba(255,68,68,0.5)] hover:text-[#ff6b3d] hover:border-[rgba(255,68,68,0.35)] transition disabled:opacity-30">
                       {btn.icon}{btn.label}
                     </button>
                   ))}
@@ -558,13 +558,13 @@ export default function ExtensionOverlay() {
           {tab === "data" && (
             <div className="p-3 space-y-3">
               <div>
-                <p className="text-[9px] font-bold tracking-[0.15em] text-cyan-400/40 mb-2 uppercase">Grade Readout</p>
+                <p className="text-[9px] font-bold tracking-[0.15em] text-[rgba(255,68,68,0.4)] mb-2 uppercase">Grade Readout</p>
                 {grades.length > 0 ? (
                   <div className="space-y-2.5">
                     {grades.map((g) => (
-                      <div key={g.name} className="rounded-lg border border-cyan-400/15 bg-cyan-950/10 p-2.5">
+                      <div key={g.name} className="rounded-lg border border-[rgba(160,21,21,0.18)] bg-[rgba(255,30,30,0.04)] p-2.5">
                         <div className="flex items-center justify-between mb-1.5">
-                          <span className="text-[11px] font-semibold text-cyan-100 truncate max-w-[75%]">{g.name}</span>
+                          <span className="text-[11px] font-semibold text-[#f5f5f5] truncate max-w-[75%]">{g.name}</span>
                           <div className="flex items-center gap-1.5 shrink-0">
                             {g.letterGrade && <span className={`font-orbitron text-[11px] font-bold ${g.percent >= 85 ? "text-green-400" : g.percent >= 70 ? "text-amber-400" : "text-red-400"}`}>{g.letterGrade}</span>}
                             <span className={`text-[11px] font-mono ${g.percent >= 85 ? "text-green-400/70" : g.percent >= 70 ? "text-amber-400/70" : "text-red-400/70"}`}>{g.percent.toFixed(1)}%</span>
@@ -579,24 +579,24 @@ export default function ExtensionOverlay() {
                   </div>
                 ) : (
                   <div className="text-center py-4">
-                    <p className="text-[11px] text-cyan-400/40">No grades loaded — sync Canvas first</p>
+                    <p className="text-[11px] text-[rgba(255,68,68,0.4)]">No grades loaded — sync Canvas first</p>
                   </div>
                 )}
               </div>
 
               <div>
-                <p className="text-[9px] font-bold tracking-[0.15em] text-cyan-400/40 mb-2 uppercase">Courses ({courses.length})</p>
+                <p className="text-[9px] font-bold tracking-[0.15em] text-[rgba(255,68,68,0.4)] mb-2 uppercase">Courses ({courses.length})</p>
                 {courses.length > 0 ? (
                   <div className="space-y-1.5">
                     {courses.map((c) => (
-                      <div key={c.id} className="flex items-center justify-between px-2.5 py-2 rounded-lg border border-cyan-400/10 bg-cyan-950/10">
-                        <span className="text-[11px] text-cyan-200 font-semibold truncate">{c.name}</span>
-                        <span className="text-[9px] text-cyan-400/40 font-mono shrink-0 ml-2">{c.assignments.length} tasks</span>
+                      <div key={c.id} className="flex items-center justify-between px-2.5 py-2 rounded-lg border border-[rgba(160,21,21,0.14)] bg-[rgba(255,30,30,0.04)]">
+                        <span className="text-[11px] text-[#f5f5f5] font-semibold truncate">{c.name}</span>
+                        <span className="text-[9px] text-[rgba(255,68,68,0.4)] font-mono shrink-0 ml-2">{c.assignments.length} tasks</span>
                       </div>
                     ))}
                   </div>
                 ) : (
-                  <p className="text-[11px] text-cyan-400/40 text-center py-3">Connect Canvas to load courses</p>
+                  <p className="text-[11px] text-[rgba(255,68,68,0.4)] text-center py-3">Connect Canvas to load courses</p>
                 )}
               </div>
             </div>
@@ -604,10 +604,10 @@ export default function ExtensionOverlay() {
         </div>
 
         {/* Footer */}
-        <div className="px-3 py-2 border-t border-cyan-400/10 flex items-center justify-between">
-          <span className="text-[9px] font-mono text-cyan-400/30">{pageContext ? new URL(pageContext.url).hostname : "canvas"}</span>
-          <span className="flex items-center gap-1 text-[9px] text-cyan-400/40">
-            <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 shadow-[0_0_4px_rgba(6,182,212,0.8)] animate-pulse" />
+        <div className="px-3 py-2 border-t border-[rgba(160,21,21,0.14)] flex items-center justify-between">
+          <span className="text-[9px] font-mono text-[rgba(255,68,68,0.35)]">{pageContext ? new URL(pageContext.url).hostname : "canvas"}</span>
+          <span className="flex items-center gap-1 text-[9px] text-[rgba(255,68,68,0.4)]">
+            <span className="w-1.5 h-1.5 rounded-full bg-[#FF4444] shadow-[0_0_4px_rgba(255,68,68,0.55)] animate-pulse" />
             LIVE
           </span>
         </div>
