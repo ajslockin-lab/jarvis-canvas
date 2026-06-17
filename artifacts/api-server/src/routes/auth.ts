@@ -28,7 +28,10 @@ const canvasUrlSchema = z.object({
 });
 
 const patSchema = z.object({
-  canvasUrl: z.string().min(1, "Canvas URL is required"),
+  canvasUrl: z
+    .string()
+    .min(1, "Canvas URL is required")
+    .regex(/^https:\/\/[a-zA-Z0-9-]+\.instructure\.com$/, "Must be a valid Canvas URL (https://school.instructure.com)"),
   pat: z.string().min(1, "Access token is required"),
 });
 

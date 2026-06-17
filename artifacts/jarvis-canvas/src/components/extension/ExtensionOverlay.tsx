@@ -1,14 +1,16 @@
-import { useState, useEffect, useCallback } from "react";
-import { Mic, X, Sparkles, Loader2, ChevronLeft, ChevronRight, ChevronDown, ChevronUp } from "lucide-react";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { Mic, X, Sparkles, Loader2, ChevronLeft, ChevronRight, Zap, MousePointer, ArrowDown, ArrowUp, Navigation, Eye, Cpu } from "lucide-react";
 
 const SESSION_KEY = "jarvis_session_token";
+const API_BASE = typeof window !== "undefined" && window.location.hostname !== "localhost"
+  ? ""
+  : "";
 
 interface Assignment {
   id: string;
   name: string;
   dueDate: string | null;
   url: string | null;
-  course?: { name: string };
   courseName?: string;
 }
 
@@ -21,12 +23,47 @@ interface Course {
 interface Grade {
   name: string;
   percent: number;
+  letterGrade?: string | null;
 }
 
+interface AgentAction {
+  type: "click" | "fill" | "scroll" | "navigate";
+  elementId?: string;
+  value?: string;
+  direction?: "up" | "down";
+  url?: string;
+}
+
+interface AgentPlan {
+  response: string;
+  action?: AgentAction;
+  blocked?: boolean;
+}
+
+type Tab = "intel" | "agent" | "data";
+
 export default function ExtensionOverlay() {
-  const [pos, setPos] = useState({ x: 0, y: 0 });
-  const [mounted, setMounted] = useState(false);
   const [sessionToken, setSessionToken] = useState<string | null>(null);
+  const [authed, setAuthed] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [courses, setCourses] = useState<Course[]>([]);
+  const [grades, setGrades] = useState<Grade[]>([]);
+  const [tab, setTab] = useState<Tab>("intel");
+  const [collapsed, setCollapsed] = useState(false);
+
+  // Agentic state
+  const [agentInput, setAgentInput] = useState("");
+  const [agentHistory, setAgentHistory] = useState<{ role: "user" | "jarvis"; text: string; action?: AgentAction; blocked?: boolean }[]>([]);
+  const [agentLoading, setAgentLoading] = useState(false);
+  const [isListening, setIsListening] = useState(false);
+  const [pageContext, setPageContext] = useState<{ url: string; title: string; elements: unknown[] } | null>(null);
+  const [lastAction, setLastAction] = useState<{ type: string; label: string } | null>(null);
+
+  // Calendar
+  const [calDate, setCalDate] = useState(new Date());
+  const [selectedDay, setSelectedDay] = useState<number | null>(null);
+
+  const historyEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const stored = localStorage.getItem(SESSION_KEY);
@@ -40,13 +77,31 @@ export default function ExtensionOverlay() {
     }
 
     const channel = new BroadcastChannel("jarvis-auth");
-    channel.onmessage = (event) => {
-      if (event.data?.type === "auth-success" && event.data.sessionToken) {
-        setSessionToken(event.data.sessionToken);
-        localStorage.setItem(SESSION_KEY, event.data.sessionToken);
+    channel.onmessage = (e) => {
+      if (e.data?.type === "auth-success" && e.data.sessionToken) {
+        setSessionToken(e.data.sessionToken);
+        localStorage.setItem(SESSION_KEY, e.data.sessionToken);
       }
     };
     return () => channel.close();
+  }, []);
+
+  // Request page context from parent (Canvas page)
+  useEffect(() => {
+    const handleMessage = (e: MessageEvent) => {
+      if (e.data?.type === "jarvis-context") {
+        setPageContext({ url: e.data.url, title: e.data.title, elements: e.data.elements || [] });
+      }
+    };
+    window.addEventListener("message", handleMessage);
+    // Request context from parent
+    if (window.parent !== window) {
+      window.parent.postMessage({ type: "jarvis-get-context" }, "*");
+    } else {
+      // Running standalone (dev/preview) — mock context
+      setPageContext({ url: window.location.href, title: document.title, elements: [] });
+    }
+    return () => window.removeEventListener("message", handleMessage);
   }, []);
 
   const authHeaders = useCallback((): Record<string, string> => {
@@ -54,80 +109,101 @@ export default function ExtensionOverlay() {
     return { "X-Session-Token": sessionToken };
   }, [sessionToken]);
 
-  useEffect(() => {
-    if (!mounted) {
-      const w = window.innerWidth;
-      const h = window.innerHeight;
-      setPos({ x: w - 420 - 16, y: h / 2 - 320 });
-      setMounted(true);
-    }
-  }, [mounted]);
-
-  const [dragging, setDragging] = useState(false);
-  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
-  const [courses, setCourses] = useState<Course[]>([]);
-  const [grades, setGrades] = useState<Grade[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [aiResponse, setAiResponse] = useState("");
-  const [transcript, setTranscript] = useState("");
-  const [isListening, setIsListening] = useState(false);
-  const [isSending, setIsSending] = useState(false);
-  const [calDate, setCalDate] = useState(new Date());
-  const [showCalendar, setShowCalendar] = useState(true);
-  const [selectedDay, setSelectedDay] = useState<number | null>(null);
-  const [authed, setAuthed] = useState(false);
-
   const fetchData = useCallback(() => {
     setLoading(true);
-    const headers = authHeaders();
-    fetch("/api/user/data", { headers, credentials: "include" })
+    const h = { ...authHeaders() };
+    fetch(`${API_BASE}/api/user/data`, { headers: h, credentials: "include" })
       .then((r) => { if (r.status === 401) { setAuthed(false); return null; } setAuthed(true); return r.json(); })
-      .then((data) => {
-        if (!data) return;
-        setCourses(Array.isArray(data.courses) ? data.courses as Course[] : []);
-      })
+      .then((data) => { if (data) setCourses(Array.isArray(data.courses) ? data.courses : []); })
       .catch(() => setCourses([]))
       .finally(() => setLoading(false));
 
-    fetch("/api/canvas/grades", { headers, credentials: "include" })
-      .then((r) => r.json())
+    fetch(`${API_BASE}/api/canvas/grades`, { headers: h, credentials: "include" })
+      .then((r) => r.ok ? r.json() : null)
       .then((data) => {
-        if (Array.isArray(data.grades)) {
-          setGrades(data.grades.map((g: { name: string; currentScore: number | null }) => ({ name: g.name, percent: g.currentScore ?? 0 })));
-        }
+        if (data?.grades) setGrades(data.grades.map((g: { name: string; currentScore: number | null; letterGrade?: string | null }) => ({ name: g.name, percent: g.currentScore ?? 0, letterGrade: g.letterGrade })));
       })
-      .catch(() => setGrades([]));
+      .catch(() => {});
   }, [authHeaders]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
   useEffect(() => { if (sessionToken) fetchData(); }, [sessionToken]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const handleMouseDown = useCallback((e: React.MouseEvent) => {
-    setDragOffset({ x: e.clientX - pos.x, y: e.clientY - pos.y });
-    setDragging(true);
-  }, [pos]);
-
   useEffect(() => {
-    const onMove = (e: MouseEvent) => { if (!dragging) return; setPos({ x: e.clientX - dragOffset.x, y: e.clientY - dragOffset.y }); };
-    const onUp = () => setDragging(false);
-    window.addEventListener("mousemove", onMove);
-    window.addEventListener("mouseup", onUp);
-    return () => { window.removeEventListener("mousemove", onMove); window.removeEventListener("mouseup", onUp); };
-  }, [dragging, dragOffset]);
+    historyEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [agentHistory]);
 
   const now = new Date();
   const allAssignments = courses
     .flatMap((c) => c.assignments.map((a) => ({ ...a, courseName: c.name })))
     .filter((a) => a.dueDate && new Date(a.dueDate) >= new Date(now.getFullYear(), now.getMonth(), now.getDate()))
-    .sort((a, b) => (a.dueDate ? new Date(a.dueDate).getTime() : 0) - (b.dueDate ? new Date(b.dueDate).getTime() : 0));
+    .sort((a, b) => new Date(a.dueDate!).getTime() - new Date(b.dueDate!).getTime());
 
-  const topAssignments = allAssignments.slice(0, 5);
+  const executeAgentAction = useCallback((action: AgentAction) => {
+    if (window.parent === window) {
+      // Standalone preview — simulate
+      const labels: Record<string, string> = { scroll: `scroll ${action.direction}`, click: "click element", fill: `type "${action.value}"`, navigate: `go to ${action.url}` };
+      setLastAction({ type: action.type, label: labels[action.type] || action.type });
+      return;
+    }
+    window.parent.postMessage({ type: "jarvis-action", action }, "*");
+    const labels: Record<string, string> = { scroll: `Scrolled ${action.direction}`, click: "Clicked element", fill: `Typed text`, navigate: `Navigated` };
+    setLastAction({ type: action.type, label: labels[action.type] || action.type });
+  }, []);
+
+  const sendAgentCommand = useCallback(async (text: string) => {
+    const trimmed = text.trim();
+    if (!trimmed || agentLoading) return;
+    setAgentInput("");
+    setAgentHistory((h) => [...h, { role: "user", text: trimmed }]);
+    setAgentLoading(true);
+
+    try {
+      const ctx = pageContext || { url: window.location.href, title: document.title, elements: [] };
+      const res = await fetch(`${API_BASE}/api/extension/agent`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeaders() },
+        credentials: "include",
+        body: JSON.stringify({ command: trimmed, pageContext: ctx }),
+      });
+      const data: AgentPlan = await res.json();
+      setAgentHistory((h) => [...h, { role: "jarvis", text: data.response, action: data.action, blocked: data.blocked }]);
+      if (data.action && !data.blocked) executeAgentAction(data.action);
+    } catch {
+      setAgentHistory((h) => [...h, { role: "jarvis", text: "Connection error — JARVIS offline." }]);
+    } finally {
+      setAgentLoading(false);
+    }
+  }, [agentLoading, authHeaders, executeAgentAction, pageContext]);
+
+  const toggleVoice = () => {
+    if (isListening) { setIsListening(false); return; }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const SpeechAPI = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechAPI) { setAgentHistory((h) => [...h, { role: "jarvis", text: "Voice not supported in this browser." }]); return; }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const rec = new SpeechAPI() as any;
+    rec.continuous = false;
+    rec.interimResults = false;
+    rec.onstart = () => setIsListening(true);
+    rec.onend = () => setIsListening(false);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    rec.onresult = (event: any) => {
+      const t = event.results[0][0].transcript;
+      setTab("agent");
+      void sendAgentCommand(t);
+    };
+    rec.start();
+    setTab("agent");
+  };
+
+  // Calendar helpers
   const startOfMonth = new Date(calDate.getFullYear(), calDate.getMonth(), 1);
   const startDay = startOfMonth.getDay();
   const daysInMonth = new Date(calDate.getFullYear(), calDate.getMonth() + 1, 0).getDate();
   const days: (number | null)[] = Array(startDay).fill(null);
   for (let d = 1; d <= daysInMonth; d++) days.push(d);
-  const dayNames = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
+  const dayNames = ["S", "M", "T", "W", "T", "F", "S"];
 
   const getAssignmentsForDay = (day: number) => allAssignments.filter((a) => {
     if (!a.dueDate) return false;
@@ -135,190 +211,328 @@ export default function ExtensionOverlay() {
     return d.getDate() === day && d.getMonth() === calDate.getMonth() && d.getFullYear() === calDate.getFullYear();
   });
 
-  const sendToAI = async (textPrompt: string) => {
-    setIsSending(true);
-    try {
-      const res = await fetch("/api/voice/command", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", ...authHeaders() },
-        credentials: "include",
-        body: JSON.stringify({ text: textPrompt }),
-      });
-      const data = await res.json();
-      setAiResponse(data.response || "No response.");
-    } catch {
-      setAiResponse("Error connecting to JARVIS.");
-    } finally {
-      setIsSending(false);
-    }
-  };
-
-  const toggleVoice = () => {
-    if (isListening) { setIsListening(false); return; }
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const SpeechAPI = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (!SpeechAPI) { setAiResponse("Voice not supported in this browser."); return; }
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const rec = new SpeechAPI() as any;
-    rec.continuous = false;
-    rec.interimResults = true;
-    rec.onstart = () => setIsListening(true);
-    rec.onend = () => setIsListening(false);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    rec.onresult = (event: any) => {
-      let t = "";
-      for (let i = 0; i < event.results.length; i++) t += event.results[i][0].transcript;
-      setTranscript(t.trim());
-      if (event.results[event.results.length - 1].isFinal) sendToAI(t.trim());
-    };
-    rec.start();
-  };
-
-  const close = () => { if (window.parent !== window) window.parent.postMessage("jarvis-close", "*"); };
-  const panel = "rounded-xl border border-cyan-400/30 bg-[#0B1B3D]/80 backdrop-blur-md shadow-[0_0_20px_rgba(6,182,212,0.15)]";
-  const selectedDayAssignments = selectedDay ? getAssignmentsForDay(selectedDay) : [];
-
   if (!authed && !loading) {
-    const handleConnect = () => {
-      window.open("/signin", "_blank");
-      const interval = setInterval(() => {
-        const token = localStorage.getItem(SESSION_KEY);
-        const headers: Record<string, string> = token ? { "X-Session-Token": token } : {};
-        fetch("/api/user/data", { headers, credentials: "include" })
-          .then((r) => { if (r.status !== 401) { clearInterval(interval); fetchData(); } })
-          .catch(() => {});
-      }, 2000);
-      setTimeout(() => clearInterval(interval), 300000);
-    };
-
     return (
-      <div className="min-h-screen w-full flex items-center justify-center">
-        <div className={`fixed w-[380px] ${panel} p-6 text-center`}>
-          <div className="flex items-center justify-center gap-2 mb-4">
+      <div className="min-h-screen flex items-start justify-end p-3">
+        <div className="w-72 rounded-xl border border-cyan-400/40 bg-[#050D1A]/95 backdrop-blur-xl shadow-[0_0_30px_rgba(6,182,212,0.2)] p-5 text-center">
+          <div className="w-10 h-10 mx-auto mb-3 rounded-full border border-cyan-400/50 bg-cyan-500/10 flex items-center justify-center">
             <Sparkles className="w-5 h-5 text-cyan-400" />
-            <span className="text-sm font-bold text-cyan-300 tracking-wider">JARVIS</span>
           </div>
-          <p className="text-sm text-cyan-300/70 mb-4">Sign in to access your Canvas data</p>
-          <button onClick={handleConnect} className="inline-flex items-center gap-2 px-4 py-2 bg-cyan-500/20 border border-cyan-400/40 text-cyan-200 text-sm font-bold rounded hover:bg-cyan-500/30 transition">
-            CONNECT CANVAS
+          <p className="font-orbitron text-xs font-bold tracking-[0.15em] text-cyan-300 mb-1">JARVIS OFFLINE</p>
+          <p className="text-[11px] text-cyan-300/50 mb-4">Sign in to activate Canvas intelligence</p>
+          <button
+            onClick={() => { window.open("/signin", "_blank"); const i = setInterval(() => { const t = localStorage.getItem(SESSION_KEY); const h: Record<string, string> = t ? { "X-Session-Token": t } : {}; fetch("/api/user/data", { headers: h, credentials: "include" }).then((r) => { if (r.status !== 401) { clearInterval(i); fetchData(); } }).catch(() => {}); }, 2000); setTimeout(() => clearInterval(i), 300000); }}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-cyan-500/20 border border-cyan-400/40 text-cyan-200 text-xs font-bold tracking-wider rounded hover:bg-cyan-500/30 transition"
+          >
+            <Zap className="w-3 h-3" /> CONNECT CANVAS
           </button>
-          <p className="text-[10px] text-cyan-300/40 mt-3">Opens in a new tab — this panel will auto-refresh</p>
         </div>
       </div>
     );
   }
 
+  if (collapsed) {
+    return (
+      <div className="min-h-screen flex items-start justify-end p-3">
+        <button
+          onClick={() => setCollapsed(false)}
+          className="group w-12 h-12 rounded-full border border-cyan-400/60 bg-[#050D1A]/95 backdrop-blur-xl shadow-[0_0_20px_rgba(6,182,212,0.3)] flex items-center justify-center transition hover:shadow-[0_0_30px_rgba(6,182,212,0.5)] hover:border-cyan-400"
+        >
+          <Sparkles className="w-5 h-5 text-cyan-400 group-hover:text-cyan-300 transition" />
+        </button>
+      </div>
+    );
+  }
+
+  const actionIconMap: Record<string, React.ReactNode> = {
+    scroll: <ArrowDown className="w-3 h-3" />,
+    click: <MousePointer className="w-3 h-3" />,
+    navigate: <Navigation className="w-3 h-3" />,
+    fill: <Cpu className="w-3 h-3" />,
+  };
+
   return (
-    <div className="min-h-screen w-full">
-      <div className={`fixed w-[420px] ${panel} overflow-hidden transition-opacity duration-300 ${mounted ? "opacity-100" : "opacity-0"}`} style={{ left: pos.x, top: pos.y }}>
-        <div className="cursor-move px-4 py-3 flex items-center justify-between bg-gradient-to-r from-cyan-500/10 to-blue-500/10 border-b border-cyan-400/20" onMouseDown={handleMouseDown}>
-          <div className="flex items-center gap-2">
-            <Sparkles className="w-4 h-4 text-cyan-400" />
-            <span className="text-sm font-bold text-cyan-300 tracking-wider">JARVIS</span>
+    <div className="min-h-screen flex items-start justify-end p-3">
+      <div className="w-[360px] rounded-2xl border border-cyan-400/30 bg-[#050D1A]/97 backdrop-blur-xl shadow-[0_0_40px_rgba(6,182,212,0.15),inset_0_1px_0_rgba(6,182,212,0.1)] overflow-hidden">
+
+        {/* Header */}
+        <div className="px-4 py-3 flex items-center justify-between border-b border-cyan-400/15 bg-gradient-to-r from-cyan-500/5 to-blue-500/5">
+          <div className="flex items-center gap-2.5">
+            <div className="relative w-7 h-7 rounded-full border border-cyan-400/50 bg-cyan-500/10 flex items-center justify-center">
+              <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
+              <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-cyan-400 shadow-[0_0_6px_rgba(6,182,212,0.8)]" />
+            </div>
+            <div>
+              <p className="font-orbitron text-[11px] font-bold tracking-[0.15em] text-cyan-300">JARVIS</p>
+              <p className="text-[9px] text-cyan-400/50 tracking-wider">CANVAS AGENT // ONLINE</p>
+            </div>
           </div>
-          <button onClick={close} className="text-cyan-300 hover:text-white transition"><X className="w-4 h-4" /></button>
+          <div className="flex items-center gap-1.5">
+            {lastAction && (
+              <span className="flex items-center gap-1 px-2 py-0.5 rounded-full border border-cyan-400/20 bg-cyan-500/10 text-[9px] text-cyan-300/70 font-mono">
+                {actionIconMap[lastAction.type]}
+                {lastAction.label}
+              </span>
+            )}
+            <button onClick={toggleVoice} title="Voice command"
+              className={`w-7 h-7 rounded-full border flex items-center justify-center transition ${isListening ? "border-red-400/60 bg-red-500/10 text-red-400" : "border-cyan-400/30 bg-cyan-500/5 text-cyan-400/70 hover:text-cyan-400 hover:border-cyan-400/50"}`}>
+              <Mic className="w-3.5 h-3.5" />
+            </button>
+            <button onClick={() => setCollapsed(true)} className="w-7 h-7 rounded-full border border-cyan-400/20 flex items-center justify-center text-cyan-400/50 hover:text-cyan-400 hover:border-cyan-400/40 transition">
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
         </div>
 
-        <div className="p-4 space-y-4 max-h-[80vh] overflow-y-auto">
-          <div className={panel + " p-3"}>
-            <button onClick={() => setShowCalendar(!showCalendar)} className="w-full flex items-center justify-between mb-1 hover:text-cyan-100 transition-colors">
-              <span className="text-sm font-bold text-cyan-300">{calDate.toLocaleString("en-US", { month: "long", year: "numeric" })}</span>
-              {showCalendar ? <ChevronUp className="w-4 h-4 text-cyan-400" /> : <ChevronDown className="w-4 h-4 text-cyan-400" />}
+        {/* Tabs */}
+        <div className="flex border-b border-cyan-400/10">
+          {([["intel", "INTEL", <Eye key="e" className="w-3 h-3" />], ["agent", "AGENT", <Cpu key="c" className="w-3 h-3" />], ["data", "DATA", <Zap key="z" className="w-3 h-3" />]] as [Tab, string, React.ReactNode][]).map(([id, label, icon]) => (
+            <button key={id} onClick={() => setTab(id)}
+              className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 text-[10px] font-bold tracking-[0.1em] transition border-b-2 ${tab === id ? "text-cyan-300 border-cyan-400 bg-cyan-500/5" : "text-cyan-400/40 border-transparent hover:text-cyan-400/60 hover:bg-cyan-500/3"}`}>
+              {icon}{label}
             </button>
-            <div className={`overflow-hidden transition-all duration-300 ${showCalendar ? "max-h-[400px] opacity-100" : "max-h-0 opacity-0"}`}>
-              <div className="flex items-center justify-between mb-2">
-                <button onClick={() => setCalDate(new Date(calDate.getFullYear(), calDate.getMonth() - 1))} className="text-cyan-400 hover:text-cyan-200"><ChevronLeft className="w-4 h-4" /></button>
-                <span className="text-xs font-semibold text-cyan-300/70">{calDate.toLocaleString("en-US", { month: "long", year: "numeric" })}</span>
-                <button onClick={() => setCalDate(new Date(calDate.getFullYear(), calDate.getMonth() + 1))} className="text-cyan-400 hover:text-cyan-200"><ChevronRight className="w-4 h-4" /></button>
-              </div>
-              <div className="grid grid-cols-7 gap-1 text-center text-[11px] mb-1">
-                {dayNames.map((d) => <span key={d} className="text-cyan-300/50">{d}</span>)}
-              </div>
-              <div className="grid grid-cols-7 gap-1">
-                {days.map((day, i) => {
-                  const dayAssignments = day ? getAssignmentsForDay(day) : [];
-                  const hasAssignments = dayAssignments.length > 0;
-                  const isToday = day && day === now.getDate() && calDate.getMonth() === now.getMonth();
-                  const isSelected = selectedDay === day;
-                  return (
-                    <button key={i} onClick={() => { if (!day) return; setSelectedDay(selectedDay === day ? null : day); }}
-                      className={`relative h-8 flex items-center justify-center text-sm rounded transition ${isSelected ? "ring-2 ring-cyan-400" : ""} ${isToday ? "bg-cyan-500/30 border border-cyan-400/50 font-bold text-white" : hasAssignments ? "text-cyan-300 font-bold hover:bg-cyan-500/10 cursor-pointer" : "text-cyan-300/40"}`}>
-                      {day || ""}
-                      {hasAssignments && <div className="absolute bottom-1 w-1.5 h-1.5 rounded-full bg-cyan-400 shadow-[0_0_6px_rgba(6,182,212,0.8)]" />}
-                    </button>
-                  );
-                })}
-              </div>
-              {selectedDayAssignments.length > 0 && (
-                <div className="mt-3 pt-3 border-t border-cyan-400/20 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <h4 className="text-xs font-semibold text-cyan-200">{calDate.toLocaleString("en-US", { month: "short" })} {selectedDay}</h4>
-                    <button onClick={() => setSelectedDay(null)} className="text-[10px] text-cyan-400 hover:text-white">Close</button>
+          ))}
+        </div>
+
+        {/* Panel content */}
+        <div className="max-h-[520px] overflow-y-auto scrollbar-thin">
+
+          {/* INTEL TAB */}
+          {tab === "intel" && (
+            <div className="p-3 space-y-3">
+              {/* Calendar */}
+              <div className="rounded-xl border border-cyan-400/20 bg-cyan-950/20 p-3">
+                <div className="flex items-center justify-between mb-2.5">
+                  <button onClick={() => setCalDate(new Date(calDate.getFullYear(), calDate.getMonth() - 1))} className="text-cyan-400/50 hover:text-cyan-400 transition"><ChevronLeft className="w-3.5 h-3.5" /></button>
+                  <span className="font-orbitron text-[10px] font-bold tracking-widest text-cyan-300/70">
+                    {calDate.toLocaleString("en-US", { month: "short", year: "numeric" }).toUpperCase()}
+                  </span>
+                  <button onClick={() => setCalDate(new Date(calDate.getFullYear(), calDate.getMonth() + 1))} className="text-cyan-400/50 hover:text-cyan-400 transition"><ChevronRight className="w-3.5 h-3.5" /></button>
+                </div>
+                <div className="grid grid-cols-7 gap-0.5 text-center mb-1">
+                  {dayNames.map((d, i) => <span key={i} className="text-[9px] text-cyan-400/30 font-bold">{d}</span>)}
+                </div>
+                <div className="grid grid-cols-7 gap-0.5">
+                  {days.map((day, i) => {
+                    const dayA = day ? getAssignmentsForDay(day) : [];
+                    const hasA = dayA.length > 0;
+                    const isToday = day === now.getDate() && calDate.getMonth() === now.getMonth() && calDate.getFullYear() === now.getFullYear();
+                    const isSel = selectedDay === day;
+                    return (
+                      <button key={i} onClick={() => day && setSelectedDay(isSel ? null : day)}
+                        className={`h-7 flex items-center justify-center rounded text-[11px] relative transition ${!day ? "cursor-default" : ""} ${isToday ? "bg-cyan-500/25 border border-cyan-400/50 text-white font-bold" : isSel ? "ring-1 ring-cyan-400 text-cyan-200" : hasA ? "text-cyan-300 font-semibold hover:bg-cyan-500/10" : "text-cyan-400/25"}`}>
+                        {day || ""}
+                        {hasA && <span className="absolute bottom-0.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-cyan-400/80" />}
+                      </button>
+                    );
+                  })}
+                </div>
+                {selectedDay && getAssignmentsForDay(selectedDay).length > 0 && (
+                  <div className="mt-2 pt-2 border-t border-cyan-400/10 space-y-1.5">
+                    {getAssignmentsForDay(selectedDay).map((a) => (
+                      <a key={a.id} href={a.url || "#"} target="_blank" rel="noopener noreferrer"
+                        className="flex items-start gap-2 p-1.5 rounded border border-cyan-400/15 hover:border-cyan-400/30 transition">
+                        <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 mt-1 shrink-0" />
+                        <div>
+                          <p className="text-[11px] font-semibold text-cyan-100 leading-tight">{a.name}</p>
+                          <p className="text-[9px] text-cyan-400/50">{a.courseName}</p>
+                        </div>
+                      </a>
+                    ))}
                   </div>
-                  {selectedDayAssignments.map((a) => (
-                    <a key={a.id} href={a.url || "#"} target="_blank" rel="noopener noreferrer" className="block p-2 rounded border border-cyan-400/20 bg-cyan-950/30 hover:border-cyan-400/40 transition">
-                      <p className="text-xs font-semibold text-cyan-100">{a.name}</p>
-                      <p className="text-[10px] text-cyan-300/50">{a.courseName}</p>
-                    </a>
-                  ))}
+                )}
+              </div>
+
+              {/* Upcoming */}
+              <div>
+                <p className="text-[9px] font-bold tracking-[0.15em] text-cyan-400/40 mb-2 uppercase">Upcoming Targets</p>
+                {loading ? (
+                  <div className="space-y-1.5">{[1,2,3].map(i => <div key={i} className="h-9 rounded-lg bg-cyan-500/5 animate-pulse" />)}</div>
+                ) : allAssignments.slice(0, 4).length > 0 ? (
+                  <div className="space-y-1.5">
+                    {allAssignments.slice(0, 4).map((a) => {
+                      const hours = a.dueDate ? Math.ceil((new Date(a.dueDate).getTime() - now.getTime()) / 3600000) : null;
+                      const urgent = hours !== null && hours < 24;
+                      const overdue = hours !== null && hours < 0;
+                      return (
+                        <a key={a.id} href={a.url || "#"} target="_blank" rel="noopener noreferrer"
+                          className={`flex items-center gap-2.5 p-2 rounded-lg border transition ${overdue ? "border-red-400/25 bg-red-950/20" : urgent ? "border-amber-400/25 bg-amber-950/20" : "border-cyan-400/15 bg-cyan-950/10 hover:border-cyan-400/30"}`}>
+                          <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${overdue ? "bg-red-400" : urgent ? "bg-amber-400 shadow-[0_0_6px_rgba(251,191,36,0.6)]" : "bg-cyan-400/50"}`} />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-[11px] font-semibold text-cyan-100 truncate">{a.name}</p>
+                            <p className="text-[9px] text-cyan-400/50 truncate">{a.courseName}</p>
+                          </div>
+                          <span className={`text-[9px] font-mono shrink-0 ${overdue ? "text-red-400" : urgent ? "text-amber-400" : "text-cyan-400/60"}`}>
+                            {overdue ? `${Math.abs(hours!)}h OD` : urgent ? `${hours}h` : a.dueDate ? new Date(a.dueDate).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : ""}
+                          </span>
+                        </a>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <p className="text-[11px] text-cyan-400/40 text-center py-3">All clear — no upcoming deadlines</p>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* AGENT TAB */}
+          {tab === "agent" && (
+            <div className="flex flex-col h-[460px]">
+              {/* Page context pill */}
+              {pageContext && (
+                <div className="px-3 py-1.5 border-b border-cyan-400/10 flex items-center gap-1.5">
+                  <Eye className="w-3 h-3 text-cyan-400/40" />
+                  <span className="text-[9px] text-cyan-400/50 truncate font-mono">{pageContext.title || pageContext.url}</span>
                 </div>
               )}
-            </div>
-          </div>
 
-          <div>
-            <h3 className="text-[10px] uppercase tracking-widest mb-2 text-cyan-300/50">Upcoming Deadlines</h3>
-            {loading ? (
-              <div className="space-y-2">{[1, 2, 3].map((i) => <div key={i} className="h-10 rounded bg-cyan-500/10 animate-pulse" />)}</div>
-            ) : topAssignments.length > 0 ? (
-              <div className="space-y-2">
-                {topAssignments.map((a) => {
-                  const hours = a.dueDate ? Math.ceil((new Date(a.dueDate).getTime() - now.getTime()) / (1000 * 60 * 60)) : null;
-                  const isOverdue = hours !== null && hours < 0;
-                  const isUrgent = hours !== null && hours >= 0 && hours < 24;
-                  return (
-                    <a key={a.id} href={a.url || "#"} target="_blank" rel="noopener noreferrer"
-                      className={`block p-2 rounded border hover:border-cyan-400/40 transition ${isOverdue ? "border-red-400/30 bg-red-950/20" : isUrgent ? "border-amber-400/30 bg-amber-950/20" : "border-cyan-400/20 bg-cyan-950/30"}`}>
-                      <p className="text-xs font-semibold text-cyan-100">{a.name}</p>
-                      <p className="text-[10px] text-cyan-300/50">{a.courseName}</p>
-                      <span className={`text-[10px] font-mono ${isOverdue ? "text-red-400" : isUrgent ? "text-amber-400" : "text-cyan-300"}`}>
-                        {isOverdue ? `OVERDUE ${Math.abs(hours!)}h` : isUrgent ? `${hours}h left` : a.dueDate ? new Date(a.dueDate).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : ""}
-                      </span>
-                    </a>
-                  );
-                })}
+              {/* History */}
+              <div className="flex-1 overflow-y-auto p-3 space-y-2.5">
+                {agentHistory.length === 0 && (
+                  <div className="text-center py-8">
+                    <div className="w-12 h-12 mx-auto mb-3 rounded-full border border-cyan-400/20 bg-cyan-500/5 flex items-center justify-center">
+                      <Cpu className="w-6 h-6 text-cyan-400/40" />
+                    </div>
+                    <p className="font-orbitron text-[10px] text-cyan-400/40 tracking-widest mb-1">AGENT MODE</p>
+                    <p className="text-[11px] text-cyan-400/30">Tell JARVIS what to do on this page.</p>
+                    <div className="mt-3 space-y-1">
+                      {["Open my assignments", "Scroll down", "Go to grades"].map((hint) => (
+                        <button key={hint} onClick={() => void sendAgentCommand(hint)}
+                          className="block w-full text-left px-2.5 py-1.5 rounded border border-cyan-400/15 text-[10px] text-cyan-400/50 hover:text-cyan-300 hover:border-cyan-400/30 transition font-mono">
+                          "{hint}"
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {agentHistory.map((msg, i) => (
+                  <div key={i} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
+                    {msg.role === "jarvis" ? (
+                      <div className="max-w-[85%] space-y-1.5">
+                        <div className={`px-3 py-2 rounded-xl rounded-tl-sm text-[12px] leading-relaxed ${msg.blocked ? "border border-amber-400/30 bg-amber-950/20 text-amber-200" : "border border-cyan-400/20 bg-cyan-950/20 text-cyan-100"}`}>
+                          {msg.text}
+                        </div>
+                        {msg.action && !msg.blocked && (
+                          <div className="flex items-center gap-1.5 px-1">
+                            <span className="text-cyan-400/50">{actionIconMap[msg.action.type]}</span>
+                            <span className="text-[9px] text-cyan-400/50 font-mono">
+                              {msg.action.type === "scroll" ? `scroll ${msg.action.direction}` : msg.action.type === "navigate" ? `→ ${msg.action.url}` : msg.action.type === "fill" ? `type: "${msg.action.value}"` : "click element"}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="max-w-[85%] px-3 py-2 rounded-xl rounded-tr-sm border border-blue-400/20 bg-blue-900/20 text-[12px] text-blue-100">
+                        {msg.text}
+                      </div>
+                    )}
+                  </div>
+                ))}
+                {agentLoading && (
+                  <div className="flex justify-start">
+                    <div className="px-3 py-2 rounded-xl rounded-tl-sm border border-cyan-400/20 bg-cyan-950/20">
+                      <div className="flex gap-1">
+                        {[0,1,2].map(i => <span key={i} className="w-1.5 h-1.5 rounded-full bg-cyan-400/60 animate-bounce" style={{ animationDelay: `${i * 0.15}s` }} />)}
+                      </div>
+                    </div>
+                  </div>
+                )}
+                <div ref={historyEndRef} />
               </div>
-            ) : <p className="text-sm text-cyan-300/50">No upcoming deadlines</p>}
-          </div>
 
-          <div>
-            <h3 className="text-[10px] uppercase tracking-widest mb-2 text-cyan-300/50">Grades</h3>
-            {grades.length > 0 ? (
-              grades.map((g) => (
-                <div key={g.name} className="mb-2">
-                  <div className="flex justify-between text-xs mb-1">
-                    <span className="text-cyan-200">{g.name}</span>
-                    <span className={`font-bold ${g.percent >= 85 ? "text-green-400" : g.percent >= 70 ? "text-amber-400" : "text-red-400"}`}>{g.percent}%</span>
+              {/* Input */}
+              <div className="p-3 border-t border-cyan-400/10">
+                <div className="flex gap-2 items-end">
+                  <div className="flex-1 relative">
+                    <input
+                      value={agentInput}
+                      onChange={(e) => setAgentInput(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void sendAgentCommand(agentInput); } }}
+                      placeholder="Tell JARVIS what to do…"
+                      className="w-full px-3 py-2 rounded-lg border border-cyan-400/20 bg-[#050D1A] text-[12px] text-cyan-100 placeholder:text-cyan-400/30 focus:outline-none focus:border-cyan-400/50 transition font-mono"
+                      disabled={agentLoading}
+                    />
                   </div>
-                  <div className="h-2 w-full bg-white/10 rounded-full">
-                    <div className={`h-full rounded-full ${g.percent >= 85 ? "bg-gradient-to-r from-green-400 to-emerald-400" : g.percent >= 70 ? "bg-gradient-to-r from-amber-400 to-yellow-400" : "bg-gradient-to-r from-red-400 to-rose-400"}`} style={{ width: `${g.percent}%` }} />
-                  </div>
+                  <button onClick={() => void sendAgentCommand(agentInput)} disabled={agentLoading || !agentInput.trim()}
+                    className="w-8 h-8 rounded-lg border border-cyan-400/30 bg-cyan-500/10 flex items-center justify-center text-cyan-400 hover:bg-cyan-500/20 hover:border-cyan-400/50 disabled:opacity-40 transition shrink-0">
+                    {agentLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Zap className="w-3.5 h-3.5" />}
+                  </button>
+                  <button onClick={toggleVoice}
+                    className={`w-8 h-8 rounded-lg border flex items-center justify-center transition shrink-0 ${isListening ? "border-red-400/60 bg-red-500/10 text-red-400" : "border-cyan-400/20 bg-cyan-500/5 text-cyan-400/60 hover:text-cyan-400 hover:border-cyan-400/40"}`}>
+                    {isListening ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Mic className="w-3.5 h-3.5" />}
+                  </button>
                 </div>
-              ))
-            ) : <p className="text-[11px] text-cyan-300/50">Connect Canvas to see grades</p>}
-          </div>
 
-          <div className="flex items-center gap-3 pt-2 border-t border-cyan-400/20">
-            <button onClick={toggleVoice} disabled={isSending}
-              className={`w-10 h-10 rounded-full flex items-center justify-center border transition shrink-0 ${isListening ? "border-red-400 bg-red-500/10" : "border-cyan-400/40 bg-cyan-500/10 hover:bg-cyan-500/20"}`}>
-              {isSending ? <Loader2 className="w-4 h-4 text-cyan-400 animate-spin" /> : isListening ? <Mic className="w-4 h-4 text-red-400" /> : <Mic className="w-4 h-4 text-cyan-400" />}
-            </button>
-            <div className="flex-1 min-w-0">
-              {transcript && <p className="text-xs text-cyan-300/60">{transcript}</p>}
-              {aiResponse && <p className="text-sm text-cyan-100">{aiResponse}</p>}
-              {!transcript && !aiResponse && <p className="text-xs text-cyan-300/50">Tap to speak</p>}
+                {/* Quick actions */}
+                <div className="flex gap-1.5 mt-2 flex-wrap">
+                  {[{ icon: <ArrowDown className="w-3 h-3" />, label: "Scroll down", cmd: "scroll down" }, { icon: <ArrowUp className="w-3 h-3" />, label: "Scroll up", cmd: "scroll up" }, { icon: <Navigation className="w-3 h-3" />, label: "Assignments", cmd: "open assignments" }, { icon: <Zap className="w-3 h-3" />, label: "Grades", cmd: "open grades" }].map((btn) => (
+                    <button key={btn.cmd} onClick={() => void sendAgentCommand(btn.cmd)} disabled={agentLoading}
+                      className="flex items-center gap-1 px-2 py-1 rounded border border-cyan-400/15 text-[9px] text-cyan-400/50 hover:text-cyan-300 hover:border-cyan-400/30 transition disabled:opacity-30">
+                      {btn.icon}{btn.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
-          </div>
+          )}
+
+          {/* DATA TAB */}
+          {tab === "data" && (
+            <div className="p-3 space-y-3">
+              <div>
+                <p className="text-[9px] font-bold tracking-[0.15em] text-cyan-400/40 mb-2 uppercase">Grade Readout</p>
+                {grades.length > 0 ? (
+                  <div className="space-y-2.5">
+                    {grades.map((g) => (
+                      <div key={g.name} className="rounded-lg border border-cyan-400/15 bg-cyan-950/10 p-2.5">
+                        <div className="flex items-center justify-between mb-1.5">
+                          <span className="text-[11px] font-semibold text-cyan-100 truncate max-w-[75%]">{g.name}</span>
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            {g.letterGrade && <span className={`font-orbitron text-[11px] font-bold ${g.percent >= 85 ? "text-green-400" : g.percent >= 70 ? "text-amber-400" : "text-red-400"}`}>{g.letterGrade}</span>}
+                            <span className={`text-[11px] font-mono ${g.percent >= 85 ? "text-green-400/70" : g.percent >= 70 ? "text-amber-400/70" : "text-red-400/70"}`}>{g.percent.toFixed(1)}%</span>
+                          </div>
+                        </div>
+                        <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden">
+                          <div className={`h-full rounded-full transition-all ${g.percent >= 85 ? "bg-gradient-to-r from-green-500 to-emerald-400" : g.percent >= 70 ? "bg-gradient-to-r from-amber-500 to-yellow-400" : "bg-gradient-to-r from-red-500 to-rose-400"}`}
+                            style={{ width: `${Math.min(g.percent, 100)}%` }} />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-4">
+                    <p className="text-[11px] text-cyan-400/40">No grades loaded — sync Canvas first</p>
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <p className="text-[9px] font-bold tracking-[0.15em] text-cyan-400/40 mb-2 uppercase">Courses ({courses.length})</p>
+                {courses.length > 0 ? (
+                  <div className="space-y-1.5">
+                    {courses.map((c) => (
+                      <div key={c.id} className="flex items-center justify-between px-2.5 py-2 rounded-lg border border-cyan-400/10 bg-cyan-950/10">
+                        <span className="text-[11px] text-cyan-200 font-semibold truncate">{c.name}</span>
+                        <span className="text-[9px] text-cyan-400/40 font-mono shrink-0 ml-2">{c.assignments.length} tasks</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-[11px] text-cyan-400/40 text-center py-3">Connect Canvas to load courses</p>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="px-3 py-2 border-t border-cyan-400/10 flex items-center justify-between">
+          <span className="text-[9px] font-mono text-cyan-400/30">{pageContext ? new URL(pageContext.url).hostname : "canvas"}</span>
+          <span className="flex items-center gap-1 text-[9px] text-cyan-400/40">
+            <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 shadow-[0_0_4px_rgba(6,182,212,0.8)] animate-pulse" />
+            LIVE
+          </span>
         </div>
       </div>
     </div>
