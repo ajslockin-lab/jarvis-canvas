@@ -26,3 +26,8 @@ externalPort = 80
 [[ports]]
 localPort = 20034
 externalPort = 3000
+
+[userenv]
+
+[userenv.shared]
+ENCRYPTION_KEY = "b80175a3e80125406adc6438cdd4bef78f2cb8e611d907973544a91bd558d920"
