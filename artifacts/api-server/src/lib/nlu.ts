@@ -29,7 +29,7 @@ async function getGroq() {
   if (!groqClient && process.env["GROQ_API_KEY"]) {
     try {
       const { default: Groq } = await import("groq-sdk");
-      groqClient = new Groq({ apiKey: process.env["GROQ_API_KEY"] });
+      groqClient = new Groq({ apiKey: process.env["GROQ_API_KEY"] }) as any;
     } catch {
       groqClient = null;
     }
