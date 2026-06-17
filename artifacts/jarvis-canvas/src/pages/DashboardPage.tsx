@@ -118,7 +118,7 @@ export default function DashboardPage() {
   const dateStr = currentTime.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" }).toUpperCase();
 
   return (
-    <div className="hud-bg min-h-screen text-[#e8f4f8]">
+    <div className="hud-bg min-h-screen text-[#f5f5f5]">
       <VoiceInterface isOpen={voiceOpen} onClose={() => setVoiceOpen(false)} />
       <div className="hud-scanline" />
 
@@ -127,29 +127,29 @@ export default function DashboardPage() {
           <span className="corner-br" />
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div className="flex items-center gap-3">
-              <div className="w-8 h-8 flex items-center justify-center border border-[#00B4FF]/40 bg-[#00B4FF]/10">
-                <Zap className="w-4 h-4 text-[#00E5FF]" />
+              <div className="w-8 h-8 flex items-center justify-center border border-[#FF4444]/40 bg-[#FF4444]/10 rounded">
+                <img src="/carvis-logo.png" alt="" className="h-5 w-5 object-contain" />
               </div>
               <div>
-                <h1 className="font-orbitron text-sm font-bold tracking-[0.15em] text-[#00E5FF]">JARVIS</h1>
-                <p className="font-rajdhani text-[11px] text-[#5a7a8a] tracking-wide">CANVAS INTELLIGENCE // OPS</p>
+                <h1 className="font-orbitron text-sm font-bold tracking-[0.15em] text-[#FF4444]">CARVIS</h1>
+                <p className="font-rajdhani text-[11px] text-[rgba(245,245,245,0.35)] tracking-wide">CANVAS INTELLIGENCE // OPS</p>
               </div>
             </div>
 
             <div className="flex flex-col items-center">
-              <span className="font-mono-data text-2xl font-bold tracking-widest text-[#00E5FF]">{timeStr}</span>
-              <span className="font-rajdhani text-[10px] tracking-[0.2em] text-[#5a7a8a] uppercase">{dateStr}</span>
+              <span className="font-mono-data text-2xl font-bold tracking-widest text-[#FF4444]">{timeStr}</span>
+              <span className="font-rajdhani text-[10px] tracking-[0.2em] text-[rgba(245,245,245,0.35)] uppercase">{dateStr}</span>
             </div>
 
             <div className="flex items-center gap-4">
               <div className="hidden md:flex items-center gap-3">
-                <div className="flex items-center gap-2 px-3 py-1.5 border border-[#FF9500]/30 bg-[#FF9500]/5">
-                  <Zap className="w-3 h-3 text-[#FF9500]" />
-                  <span className="font-mono-data text-xs text-[#FF9500] font-bold">{dueToday} DUE_TODAY</span>
+                <div className="flex items-center gap-2 px-3 py-1.5 border border-[#FF6B3D]/30 bg-[#FF6B3D]/5 rounded">
+                  <Zap className="w-3 h-3 text-[#FF6B3D]" />
+                  <span className="font-mono-data text-xs text-[#FF6B3D] font-bold">{dueToday} DUE_TODAY</span>
                 </div>
-                <div className="flex items-center gap-2 px-3 py-1.5 border border-[#00B4FF]/30 bg-[#00B4FF]/5">
-                  <Bell className="w-3 h-3 text-[#00B4FF]" />
-                  <span className="font-mono-data text-xs text-[#00B4FF] font-bold">{dueThisWeek} THIS_WEEK</span>
+                <div className="flex items-center gap-2 px-3 py-1.5 border border-[#FF4444]/30 bg-[#FF4444]/5 rounded">
+                  <Bell className="w-3 h-3 text-[#FF4444]" />
+                  <span className="font-mono-data text-xs text-[#FF4444] font-bold">{dueThisWeek} THIS_WEEK</span>
                 </div>
               </div>
 
@@ -158,7 +158,7 @@ export default function DashboardPage() {
                 <span className="hidden sm:inline">SYNC</span>
               </button>
 
-              <Link href="/settings" className="hud-gear p-2 border border-[#00B4FF]/20 text-[#5a7a8a] hover:text-[#00E5FF] hover:border-[#00E5FF]/40 transition-all inline-flex">
+              <Link href="/settings" className="hud-gear p-2 border border-[rgba(160,21,21,0.25)] text-[rgba(245,245,245,0.4)] hover:text-[#FF4444] hover:border-[#FF4444]/40 transition-all inline-flex rounded-lg">
                 <Settings className="w-4 h-4" />
               </Link>
             </div>
@@ -167,17 +167,17 @@ export default function DashboardPage() {
 
         {error && (
           <div className="hud-alert hud-alert-urgent mb-6 p-4 flex items-center gap-3">
-            <AlertCircle className="w-5 h-5 text-[#FF9500] shrink-0" />
-            <p className="font-rajdhani text-sm text-[#FF9500]">{error}</p>
+            <AlertCircle className="w-5 h-5 text-[#FF6B3D] shrink-0" />
+            <p className="font-rajdhani text-sm text-[#FF6B3D]">{error}</p>
           </div>
         )}
 
         <div className="text-center mb-10">
           <button onClick={() => setVoiceOpen(true)} className="arc-reactor-btn inline-flex items-center gap-3 px-12 py-5">
             <Mic className="w-5 h-5" />
-            <span>ACTIVATE JARVIS</span>
+            <span>ACTIVATE CARVIS</span>
           </button>
-          <p className="mt-4 font-mono-data text-[11px] text-[#7d99aa] tracking-wide">
+          <p className="mt-4 font-mono-data text-[11px] text-[rgba(245,245,245,0.45)] tracking-wide">
             CMD: "WHAT IS DUE THIS WEEK?" // "REMIND ME 2 HOURS BEFORE BIO LAB"
           </p>
         </div>
@@ -185,10 +185,10 @@ export default function DashboardPage() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 space-y-6">
             <div className="hud-section-header">
-              <BookOpen className="w-4 h-4 text-[#00B4FF]" />
-              <h2 className="font-orbitron text-xs font-bold tracking-[0.2em] text-[#00B4FF] uppercase">UPCOMING TARGETS</h2>
+              <BookOpen className="w-4 h-4 text-[#FF4444]" />
+              <h2 className="font-orbitron text-xs font-bold tracking-[0.2em] text-[#FF4444] uppercase">UPCOMING TARGETS</h2>
               {lastSync && (
-                <span className="font-mono-data text-[10px] text-[#5a7a8a] ml-2">
+                <span className="font-mono-data text-[10px] text-[rgba(245,245,245,0.35)] ml-2">
                   SYNCED {new Date(lastSync).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                 </span>
               )}
@@ -197,7 +197,7 @@ export default function DashboardPage() {
             {loading ? (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {[1, 2, 3, 4].map((i) => (
-                  <div key={i} className="h-24 border border-[#00B4FF]/10 bg-[#0A1520]/50 animate-pulse" />
+                  <div key={i} className="h-24 border border-[rgba(160,21,21,0.15)] bg-[#0a0000]/50 animate-pulse rounded-lg" />
                 ))}
               </div>
             ) : upcomingAssignments.length > 0 ? (
@@ -219,16 +219,16 @@ export default function DashboardPage() {
             ) : (
               <div className="hud-panel p-8 text-center">
                 <span className="corner-br" />
-                <BookOpen className="w-6 h-6 text-[#5a7a8a] mx-auto mb-3" />
-                <p className="font-orbitron text-sm text-[#5a7a8a]">NO TARGETS DETECTED</p>
-                <p className="font-mono-data text-[11px] text-[#5a7a8a] mt-1">CONNECT CANVAS IN SYSTEM SETTINGS</p>
+                <BookOpen className="w-6 h-6 text-[rgba(245,245,245,0.35)] mx-auto mb-3" />
+                <p className="font-orbitron text-sm text-[rgba(245,245,245,0.35)]">NO TARGETS DETECTED</p>
+                <p className="font-mono-data text-[11px] text-[rgba(245,245,245,0.35)] mt-1">CONNECT CANVAS IN SYSTEM SETTINGS</p>
               </div>
             )}
 
             <div className="mt-8">
               <div className="hud-section-header">
-                <LayoutDashboard className="w-4 h-4 text-[#00B4FF]" />
-                <h2 className="font-orbitron text-xs font-bold tracking-[0.2em] text-[#00B4FF] uppercase">MISSION TIMELINE</h2>
+                <LayoutDashboard className="w-4 h-4 text-[#FF4444]" />
+                <h2 className="font-orbitron text-xs font-bold tracking-[0.2em] text-[#FF4444] uppercase">MISSION TIMELINE</h2>
               </div>
               <FunctionalCalendar assignments={allAssignments} referenceDate={currentTime} />
             </div>
@@ -247,8 +247,8 @@ export default function DashboardPage() {
             <div className="hud-panel p-5">
               <span className="corner-br" />
               <div className="hud-section-header mb-4">
-                <Zap className="w-4 h-4 text-[#FF9500]" />
-                <h2 className="font-orbitron text-xs font-bold tracking-[0.2em] text-[#FF9500] uppercase">JARVIS INTEL</h2>
+                <Zap className="w-4 h-4 text-[#FF6B3D]" />
+                <h2 className="font-orbitron text-xs font-bold tracking-[0.2em] text-[#FF6B3D] uppercase">CARVIS INTEL</h2>
               </div>
               <ProactiveFeed />
             </div>

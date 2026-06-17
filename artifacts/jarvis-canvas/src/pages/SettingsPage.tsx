@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Volume2, VolumeX, Bell, BellOff, Moon, User, AlertCircle, RefreshCw, ArrowLeft, Zap } from "lucide-react";
+import { Volume2, VolumeX, Bell, BellOff, Moon, User, AlertCircle, RefreshCw, ArrowLeft } from "lucide-react";
 import CanvasConnectButton from "@/components/auth/CanvasConnectButton";
 import { Link } from "wouter";
 
@@ -37,17 +37,15 @@ export default function SettingsPage() {
   };
 
   return (
-    <div className="hud-bg min-h-screen text-[#e8f4f8]">
+    <div className="hud-bg min-h-screen text-[#f5f5f5]">
       <div className="hud-scanline" />
       <div className="relative z-10 max-w-2xl mx-auto p-6">
         <div className="flex items-center justify-between mb-8">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 flex items-center justify-center border border-[#00B4FF]/40 bg-[#00B4FF]/10">
-              <Zap className="w-4 h-4 text-[#00E5FF]" />
-            </div>
+            <img src="/carvis-logo.png" alt="" className="h-8 w-8 object-contain" />
             <div>
-              <h1 className="font-orbitron text-lg font-bold tracking-[0.15em] text-[#00E5FF]">SYSTEM CONFIG</h1>
-              <p className="font-rajdhani text-[11px] text-[#5a7a8a] tracking-wide">PERSONALIZE JARVIS OPERATIONS</p>
+              <h1 className="font-orbitron text-lg font-bold tracking-[0.15em] text-[#FF4444]">SYSTEM CONFIG</h1>
+              <p className="font-rajdhani text-[11px] text-[rgba(245,245,245,0.35)] tracking-wide">PERSONALIZE CARVIS OPERATIONS</p>
             </div>
           </div>
           <Link href="/dashboard" className="hud-btn px-3 py-2 flex items-center gap-2">
@@ -83,7 +81,7 @@ export default function SettingsPage() {
             <ToggleRow
               icon={ttsEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
               label="TEXT-TO-SPEECH"
-              description="JARVIS reads responses out loud"
+              description="CARVIS reads responses out loud"
               enabled={ttsEnabled}
               onToggle={() => setTtsEnabled(!ttsEnabled)}
             />
@@ -99,7 +97,7 @@ export default function SettingsPage() {
 
         <SettingsSection title="ENERGY LEVEL" icon={<Moon className="w-4 h-4" />}>
           <div className="space-y-3">
-            <p className="font-rajdhani text-[13px] text-[#5a7a8a]">How much energy you typically have. JARVIS uses this to suggest study tasks.</p>
+            <p className="font-rajdhani text-[13px] text-[rgba(245,245,245,0.4)]">How much energy you typically have. CARVIS uses this to suggest study tasks.</p>
             <div className="flex items-center gap-3">
               <span className="font-orbitron text-[10px] text-[#5a7a8a] tracking-wider">LOW</span>
               <div className="flex-1 grid grid-cols-5 gap-1">
@@ -107,7 +105,7 @@ export default function SettingsPage() {
                   <button
                     key={level}
                     onClick={() => setEnergyLevel(level)}
-                    className={`h-10 transition-all ${level <= energyLevel ? "border border-[#00E5FF]/50 bg-[#00E5FF]/10 shadow-[0_0_8px_rgba(0,229,255,0.15)]" : "border border-[#00B4FF]/10 bg-[#0A1520]/50 hover:border-[#00B4FF]/25"}`}
+                    className={`h-10 transition-all rounded ${level <= energyLevel ? "border border-[#FF4444]/50 bg-[#FF4444]/10 shadow-[0_0_8px_rgba(255,68,68,0.15)]" : "border border-[rgba(160,21,21,0.15)] bg-[#0a0000]/50 hover:border-[#FF4444]/25"}`}
                   >
                     <span className="sr-only">Energy {level}</span>
                   </button>
@@ -115,7 +113,7 @@ export default function SettingsPage() {
               </div>
               <span className="font-orbitron text-[10px] text-[#5a7a8a] tracking-wider">HIGH</span>
             </div>
-            <p className="font-rajdhani text-[13px] text-[#00E5FF]">
+            <p className="font-rajdhani text-[13px] text-[#FF4444]">
               {energyLevel <= 2 ? "Study shorter, more frequent sessions" : "Longer deep-work blocks work for you"}
             </p>
           </div>
@@ -128,7 +126,7 @@ export default function SettingsPage() {
             <div>
               <p className="font-orbitron text-[11px] font-bold tracking-[0.1em] text-[#e8f4f8] mb-1">SECURITY NOTICE</p>
               <p className="font-rajdhani text-[13px] text-[#5a7a8a]">
-                Your Canvas token is encrypted and never leaves the server. JARVIS only reads your Canvas data — it never modifies anything.
+                Your Canvas token is encrypted and never leaves the server. CARVIS only reads your Canvas data — it never modifies anything.
               </p>
             </div>
           </div>
@@ -143,8 +141,8 @@ function SettingsSection({ title, icon, children }: { title: string; icon: React
     <div className="hud-panel mb-8 p-6">
       <span className="corner-br" />
       <div className="hud-section-header mb-5">
-        <div className="p-1.5 border border-[#00B4FF]/20 text-[#00B4FF]">{icon}</div>
-        <h2 className="font-orbitron text-[11px] font-bold tracking-[0.2em] text-[#00B4FF]">{title}</h2>
+        <div className="p-1.5 border border-[rgba(160,21,21,0.25)] text-[#FF4444] rounded">{icon}</div>
+        <h2 className="font-orbitron text-[11px] font-bold tracking-[0.2em] text-[#FF4444]">{title}</h2>
       </div>
       <div className="space-y-4">{children}</div>
     </div>
@@ -155,14 +153,14 @@ function ToggleRow({ icon, label, description, enabled, onToggle }: { icon: Reac
   return (
     <div className="flex items-center justify-between py-2">
       <div className="flex items-center gap-3">
-        <div className="p-1.5 border border-[#00B4FF]/10 text-[#5a7a8a]">{icon}</div>
+        <div className="p-1.5 border border-[rgba(160,21,21,0.15)] text-[rgba(245,245,245,0.4)] rounded">{icon}</div>
         <div>
-          <p className="font-orbitron text-[11px] font-bold tracking-[0.1em] text-[#e8f4f8]">{label}</p>
-          <p className="font-rajdhani text-[11px] text-[#5a7a8a]">{description}</p>
+          <p className="font-orbitron text-[11px] font-bold tracking-[0.1em] text-[#f5f5f5]">{label}</p>
+          <p className="font-rajdhani text-[11px] text-[rgba(245,245,245,0.4)]">{description}</p>
         </div>
       </div>
-      <button onClick={onToggle} className={`relative w-12 h-6 transition-colors ${enabled ? "bg-[#00B4FF]/40" : "bg-[#0A1520] border border-[#00B4FF]/10"}`}>
-        <div className={`absolute top-0.5 w-5 h-5 transition-transform shadow-sm ${enabled ? "translate-x-6 bg-[#00E5FF]" : "translate-x-0.5 bg-[#5a7a8a]"}`} />
+      <button onClick={onToggle} className={`relative w-12 h-6 transition-colors rounded-full ${enabled ? "bg-[#FF4444]/40" : "bg-[#0a0000] border border-[rgba(160,21,21,0.15)]"}`}>
+        <div className={`absolute top-0.5 w-5 h-5 transition-transform shadow-sm rounded-full ${enabled ? "translate-x-6 bg-[#FF4444]" : "translate-x-0.5 bg-[rgba(245,245,245,0.35)]"}`} />
       </button>
     </div>
   );

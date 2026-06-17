@@ -1,0 +1,23 @@
+{
+  "manifest_version": 3,
+  "name": "CARVIS Canvas Assistant",
+  "version": "0.2.0",
+  "description": "CARVIS on Canvas — deadlines, grades, voice agent, and page control",
+  "permissions": ["storage", "activeTab"],
+  "host_permissions": [
+    "http://localhost:20034/*",
+    "http://127.0.0.1:20034/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": ["*://*.instructure.com/*"],
+      "js": ["contentScript.js"],
+      "css": ["styles.css"],
+      "run_at": "document_end"
+    }
+  ],
+  "icons": {
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
+}

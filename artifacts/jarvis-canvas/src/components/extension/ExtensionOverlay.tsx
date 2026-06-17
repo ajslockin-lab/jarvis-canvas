@@ -63,6 +63,49 @@ export default function ExtensionOverlay() {
   // Calendar
   const [calDate, setCalDate] = useState(new Date());
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
+  const [connecting, setConnecting] = useState(false);
+
+  const applySession = useCallback((token: string) => {
+    setSessionToken(token);
+    localStorage.setItem(SESSION_KEY, token);
+    if (window.parent !== window) {
+      window.parent.postMessage({ type: "carvis-store-session", sessionToken: token }, "*");
+    }
+  }, []);
+
+  const handleConnect = useCallback(() => {
+    setConnecting(true);
+    const signinUrl = `${window.location.origin}/signin?from=extension`;
+    const popup = window.open(signinUrl, "carvis-signin", "width=480,height=720");
+
+    const onMessage = (event: MessageEvent) => {
+      if (event.origin !== window.location.origin) return;
+      if (event.data?.type === "jarvis-auth-success" && event.data.sessionToken) {
+        applySession(event.data.sessionToken);
+        setConnecting(false);
+        window.removeEventListener("message", onMessage);
+        popup?.close();
+      }
+    };
+
+    window.addEventListener("message", onMessage);
+
+    const poll = window.setInterval(() => {
+      if (popup?.closed) {
+        window.clearInterval(poll);
+        setConnecting(false);
+        window.removeEventListener("message", onMessage);
+      }
+    }, 1000);
+  }, [applySession]);
+
+  const closePanel = useCallback(() => {
+    if (window.parent !== window) {
+      window.parent.postMessage({ type: "jarvis-close" }, "*");
+      return;
+    }
+    setCollapsed(true);
+  }, []);
 
   const historyEndRef = useRef<HTMLDivElement>(null);
 
@@ -73,21 +116,19 @@ export default function ExtensionOverlay() {
     const params = new URLSearchParams(window.location.search);
     const tokenParam = params.get("session_token");
     if (tokenParam) {
-      setSessionToken(tokenParam);
-      localStorage.setItem(SESSION_KEY, tokenParam);
+      applySession(tokenParam);
     }
 
     const channel = new BroadcastChannel("jarvis-auth");
     channel.onmessage = (e) => {
       if (e.data?.type === "auth-success" && e.data.sessionToken) {
-        setSessionToken(e.data.sessionToken);
-        localStorage.setItem(SESSION_KEY, e.data.sessionToken);
+        applySession(e.data.sessionToken);
       }
     };
     return () => channel.close();
-  }, []);
+  }, [applySession]);
 
-  // Request page context from parent (Canvas page)
+  // Listen for page context from parent (Canvas content script)
   useEffect(() => {
     const handleMessage = (e: MessageEvent) => {
       if (e.data?.type === "jarvis-context") {
@@ -95,15 +136,23 @@ export default function ExtensionOverlay() {
       }
     };
     window.addEventListener("message", handleMessage);
-    // Request context from parent
-    if (window.parent !== window) {
-      window.parent.postMessage({ type: "jarvis-get-context" }, "*");
-    } else {
-      // Running standalone (dev/preview) — mock context
+    if (window.parent === window) {
       setPageContext({ url: window.location.href, title: document.title, elements: [] });
     }
     return () => window.removeEventListener("message", handleMessage);
   }, []);
+
+  // Request context from parent on open and when agent tab is active
+  useEffect(() => {
+    const requestContext = () => {
+      if (window.parent !== window) {
+        window.parent.postMessage({ type: "jarvis-get-context" }, "*");
+      }
+    };
+    requestContext();
+    const interval = setInterval(requestContext, 8000);
+    return () => clearInterval(interval);
+  }, [tab]);
 
   const authHeaders = useCallback((): Record<string, string> => {
     if (!sessionToken) return {};
@@ -181,7 +230,7 @@ export default function ExtensionOverlay() {
       speak(data.response);
       if (data.action && !data.blocked) executeAgentAction(data.action);
     } catch {
-      const errMsg = "Connection error — JARVIS offline.";
+      const errMsg = "Connection error — CARVIS offline.";
       setAgentHistory((h) => [...h, { role: "jarvis", text: errMsg }]);
       speak(errMsg);
     } finally {
@@ -226,18 +275,23 @@ export default function ExtensionOverlay() {
 
   if (!authed && !loading) {
     return (
-      <div className="min-h-screen flex items-start justify-end p-3">
-        <div className="w-72 rounded-xl border border-cyan-400/40 bg-[#050D1A]/95 backdrop-blur-xl shadow-[0_0_30px_rgba(6,182,212,0.2)] p-5 text-center">
-          <div className="w-10 h-10 mx-auto mb-3 rounded-full border border-cyan-400/50 bg-cyan-500/10 flex items-center justify-center">
-            <Sparkles className="w-5 h-5 text-cyan-400" />
+      <div className="pointer-events-none min-h-screen flex items-start justify-end p-3">
+        <div className="pointer-events-auto w-72 rounded-xl border border-[rgba(160,21,21,0.35)] bg-black/95 backdrop-blur-xl shadow-[0_0_30px_rgba(255,30,30,0.15)] p-5 text-center">
+          <div className="w-10 h-10 mx-auto mb-3 rounded-full border border-[rgba(255,68,68,0.4)] bg-[rgba(255,30,30,0.08)] flex items-center justify-center">
+            <img src="/carvis-logo.png" alt="" className="h-6 w-6 object-contain" />
           </div>
-          <p className="font-orbitron text-xs font-bold tracking-[0.15em] text-cyan-300 mb-1">JARVIS OFFLINE</p>
-          <p className="text-[11px] text-cyan-300/50 mb-4">Sign in to activate Canvas intelligence</p>
+          <p className="font-orbitron text-xs font-bold tracking-[0.15em] text-[#FF4444] mb-1">CARVIS OFFLINE</p>
+          <p className="text-[11px] text-[rgba(245,245,245,0.45)] mb-4">Sign in to activate Canvas intelligence</p>
           <button
-            onClick={() => { window.open("/signin", "_blank"); const i = setInterval(() => { const t = localStorage.getItem(SESSION_KEY); const h: Record<string, string> = t ? { "X-Session-Token": t } : {}; fetch("/api/user/data", { headers: h, credentials: "include" }).then((r) => { if (r.status !== 401) { clearInterval(i); fetchData(); } }).catch(() => {}); }, 2000); setTimeout(() => clearInterval(i), 300000); }}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-cyan-500/20 border border-cyan-400/40 text-cyan-200 text-xs font-bold tracking-wider rounded hover:bg-cyan-500/30 transition"
+            onClick={handleConnect}
+            disabled={connecting}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-[rgba(255,30,30,0.12)] border border-[rgba(255,68,68,0.35)] text-[#FF4444] text-xs font-bold tracking-wider rounded-lg hover:bg-[rgba(255,30,30,0.2)] transition disabled:opacity-60"
           >
-            <Zap className="w-3 h-3" /> CONNECT CANVAS
+            {connecting ? (
+              <><Loader2 className="w-3 h-3 animate-spin" /> WAITING FOR SIGN IN...</>
+            ) : (
+              <><Zap className="w-3 h-3" /> CONNECT CANVAS</>
+            )}
           </button>
         </div>
       </div>
@@ -246,12 +300,12 @@ export default function ExtensionOverlay() {
 
   if (collapsed) {
     return (
-      <div className="min-h-screen flex items-start justify-end p-3">
+      <div className="pointer-events-none min-h-screen flex items-start justify-end p-3">
         <button
           onClick={() => setCollapsed(false)}
-          className="group w-12 h-12 rounded-full border border-cyan-400/60 bg-[#050D1A]/95 backdrop-blur-xl shadow-[0_0_20px_rgba(6,182,212,0.3)] flex items-center justify-center transition hover:shadow-[0_0_30px_rgba(6,182,212,0.5)] hover:border-cyan-400"
+          className="pointer-events-auto group w-12 h-12 rounded-full border border-[rgba(255,68,68,0.5)] bg-black/95 backdrop-blur-xl shadow-[0_0_20px_rgba(255,30,30,0.25)] flex items-center justify-center transition hover:shadow-[0_0_30px_rgba(255,68,68,0.4)] hover:border-[#FF4444]"
         >
-          <Sparkles className="w-5 h-5 text-cyan-400 group-hover:text-cyan-300 transition" />
+          <Sparkles className="w-5 h-5 text-[#FF4444] group-hover:text-[#ff6b3d] transition" />
         </button>
       </div>
     );
@@ -265,8 +319,8 @@ export default function ExtensionOverlay() {
   };
 
   return (
-    <div className="min-h-screen flex items-start justify-end p-3">
-      <div className="w-[360px] rounded-2xl border border-cyan-400/30 bg-[#050D1A]/97 backdrop-blur-xl shadow-[0_0_40px_rgba(6,182,212,0.15),inset_0_1px_0_rgba(6,182,212,0.1)] overflow-hidden">
+    <div className="pointer-events-none min-h-screen flex items-start justify-end p-3">
+      <div className="pointer-events-auto w-[360px] rounded-2xl border border-[rgba(160,21,21,0.3)] bg-black/97 backdrop-blur-xl shadow-[0_0_40px_rgba(255,30,30,0.12),inset_0_1px_0_rgba(255,68,68,0.08)] overflow-hidden">
 
         {/* Header */}
         <div className="px-4 py-3 flex items-center justify-between border-b border-cyan-400/15 bg-gradient-to-r from-cyan-500/5 to-blue-500/5">
@@ -276,7 +330,7 @@ export default function ExtensionOverlay() {
               <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-cyan-400 shadow-[0_0_6px_rgba(6,182,212,0.8)]" />
             </div>
             <div>
-              <p className="font-orbitron text-[11px] font-bold tracking-[0.15em] text-cyan-300">JARVIS</p>
+              <p className="font-orbitron text-[11px] font-bold tracking-[0.15em] text-cyan-300">CARVIS</p>
               <p className="text-[9px] text-cyan-400/50 tracking-wider">CANVAS AGENT // ONLINE</p>
             </div>
           </div>
@@ -291,7 +345,7 @@ export default function ExtensionOverlay() {
               className={`w-7 h-7 rounded-full border flex items-center justify-center transition ${isListening ? "border-red-400/60 bg-red-500/10 text-red-400" : "border-cyan-400/30 bg-cyan-500/5 text-cyan-400/70 hover:text-cyan-400 hover:border-cyan-400/50"}`}>
               <Mic className="w-3.5 h-3.5" />
             </button>
-            <button onClick={() => setCollapsed(true)} className="w-7 h-7 rounded-full border border-cyan-400/20 flex items-center justify-center text-cyan-400/50 hover:text-cyan-400 hover:border-cyan-400/40 transition">
+            <button onClick={closePanel} className="w-7 h-7 rounded-full border border-[rgba(160,21,21,0.25)] flex items-center justify-center text-[rgba(255,68,68,0.5)] hover:text-[#FF4444] hover:border-[#FF4444]/40 transition">
               <X className="w-3.5 h-3.5" />
             </button>
           </div>
@@ -403,7 +457,7 @@ export default function ExtensionOverlay() {
                 {!pageContext && <span className="flex-1" />}
                 <button
                   onClick={() => { setTtsEnabled((v) => !v); if (ttsEnabled) window.speechSynthesis?.cancel(); }}
-                  title={ttsEnabled ? "Mute JARVIS voice" : "Unmute JARVIS voice"}
+                  title={ttsEnabled ? "Mute CARVIS voice" : "Unmute CARVIS voice"}
                   className={`w-6 h-6 rounded flex items-center justify-center border transition shrink-0 ${ttsEnabled ? "border-cyan-400/40 bg-cyan-500/10 text-cyan-400" : "border-cyan-400/15 text-cyan-400/30 hover:text-cyan-400/50"}`}
                 >
                   {ttsEnabled ? <Volume2 className="w-3 h-3" /> : <VolumeX className="w-3 h-3" />}
@@ -418,7 +472,7 @@ export default function ExtensionOverlay() {
                       <Cpu className="w-6 h-6 text-cyan-400/40" />
                     </div>
                     <p className="font-orbitron text-[10px] text-cyan-400/40 tracking-widest mb-1">AGENT MODE</p>
-                    <p className="text-[11px] text-cyan-400/30">Tell JARVIS what to do on this page.</p>
+                    <p className="text-[11px] text-cyan-400/30">Tell CARVIS what to do on this page.</p>
                     <div className="mt-3 space-y-1">
                       {["Open my assignments", "Scroll down", "Go to grades"].map((hint) => (
                         <button key={hint} onClick={() => void sendAgentCommand(hint)}
@@ -472,7 +526,7 @@ export default function ExtensionOverlay() {
                       value={agentInput}
                       onChange={(e) => setAgentInput(e.target.value)}
                       onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void sendAgentCommand(agentInput); } }}
-                      placeholder="Tell JARVIS what to do…"
+                      placeholder="Tell CARVIS what to do…"
                       className="w-full px-3 py-2 rounded-lg border border-cyan-400/20 bg-[#050D1A] text-[12px] text-cyan-100 placeholder:text-cyan-400/30 focus:outline-none focus:border-cyan-400/50 transition font-mono"
                       disabled={agentLoading}
                     />

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Mic, Volume2, VolumeX, X } from "lucide-react";
-import Waveform from "./Waveform";
+import { Volume2, VolumeX, X } from "lucide-react";
+import CarvisOrb from "./CarvisOrb";
+import type { OrbState } from "@/lib/carvisOrb";
 
 interface VoiceInterfaceProps {
   isOpen: boolean;
@@ -44,6 +45,28 @@ function getSpeechRecognition(): SpeechRecognitionConstructor | null {
   return w.SpeechRecognition ?? w.webkitSpeechRecognition ?? null;
 }
 
+function getOrbState(isListening: boolean, isLoading: boolean, isTtsPlaying: boolean): OrbState {
+  if (isLoading) return "thinking";
+  if (isTtsPlaying) return "speaking";
+  if (isListening) return "listening";
+  return "idle";
+}
+
+function getStatusText(
+  speechSupported: boolean,
+  isListening: boolean,
+  isLoading: boolean,
+  isTtsPlaying: boolean,
+  ttsEnabled: boolean,
+): string {
+  if (!speechSupported) return "speech not supported";
+  if (!ttsEnabled) return "muted";
+  if (isLoading) return "thinking...";
+  if (isTtsPlaying) return "";
+  if (isListening) return "listening...";
+  return "press and hold to speak";
+}
+
 export default function VoiceInterface({ isOpen, onClose }: VoiceInterfaceProps) {
   const [isListening, setIsListening] = useState(false);
   const [transcript, setTranscript] = useState("");
@@ -53,7 +76,6 @@ export default function VoiceInterface({ isOpen, onClose }: VoiceInterfaceProps)
   const [isLoading, setIsLoading] = useState(false);
   const [speechSupported] = useState(() => Boolean(getSpeechRecognition()));
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
   const finalTranscriptRef = useRef("");
   const displayTranscriptRef = useRef("");
   const shouldSubmitRef = useRef(false);
@@ -146,7 +168,7 @@ export default function VoiceInterface({ isOpen, onClose }: VoiceInterfaceProps)
   }, [submitCommand]);
 
   const startListening = () => {
-    if (!recognitionRef.current || isLoading || isListening) return;
+    if (!recognitionRef.current || isLoading || isListening || !speechSupported) return;
     stopTts();
     finalTranscriptRef.current = "";
     displayTranscriptRef.current = "";
@@ -169,67 +191,68 @@ export default function VoiceInterface({ isOpen, onClose }: VoiceInterfaceProps)
 
   if (!isOpen) return null;
 
+  const orbState = getOrbState(isListening, isLoading, isTtsPlaying);
+  const statusText = getStatusText(speechSupported, isListening, isLoading, isTtsPlaying, ttsEnabled);
+
   return (
-    <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-[#050A10]/95 p-6 backdrop-blur-xl">
-      <div className="hud-scanline" />
+    <div className="carvis-voice fixed inset-0 z-50 overflow-hidden bg-black">
+      <CarvisOrb state={orbState} />
 
-      <button
-        onClick={onClose}
-        className="hud-gear absolute right-6 top-6 rounded-lg border border-[#00B4FF]/20 p-3 text-[#7d99aa] transition hover:border-[#00E5FF]/40 hover:text-[#00E5FF]"
-        aria-label="Close voice interface"
-      >
-        <X className="h-5 w-5" />
-      </button>
+      <img
+        src="/carvis-logo.png"
+        alt="CARVIS"
+        className="absolute left-4 top-4 z-20 max-h-10 max-w-[140px] object-contain opacity-85"
+      />
 
-      <button
-        onClick={() => { if (ttsEnabled) stopTts(); setTtsEnabled((e) => !e); }}
-        className="hud-gear absolute left-6 top-6 rounded-lg border border-[#00B4FF]/20 p-3 text-[#7d99aa] transition hover:border-[#00E5FF]/40 hover:text-[#00E5FF]"
-        aria-label={ttsEnabled ? "Turn voice playback off" : "Turn voice playback on"}
-      >
-        {ttsEnabled ? <Volume2 className="h-5 w-5" /> : <VolumeX className="h-5 w-5" />}
-      </button>
-
-      <div className="relative z-10 flex w-full max-w-2xl flex-1 flex-col items-center justify-center">
-        <div className="hud-section-header mb-4 w-full">
-          <span className="font-orbitron text-[10px] tracking-[0.2em] text-[#7d99aa]">VOICE INTERFACE</span>
-        </div>
-
-        <div className="mb-8">
-          <Waveform isActive={isListening || isTtsPlaying || isLoading} canvasRef={canvasRef} />
-        </div>
-
+      <div className="carvis-controls absolute right-4 top-4 z-20 flex gap-2">
         <button
-          onPointerDown={startListening}
-          onPointerUp={stopListening}
-          onPointerCancel={stopListening}
-          onPointerLeave={stopListening}
-          disabled={isLoading || !speechSupported}
-          className={`arc-reactor-btn flex h-28 w-28 touch-none items-center justify-center transition-all duration-300 ${isListening ? "!border-[#FF9500]/50 !bg-[#FF9500]/10 shadow-[0_0_40px_rgba(255,149,0,0.22)]" : ""} ${isLoading || !speechSupported ? "!border-[#5a7a8a]/30 !bg-[#0A1520]/50 opacity-70" : ""}`}
+          type="button"
+          onClick={() => {
+            if (ttsEnabled) stopTts();
+            setTtsEnabled((e) => !e);
+          }}
+          className={`carvis-control-btn ${!ttsEnabled ? "muted" : ""}`}
+          aria-label={ttsEnabled ? "Turn voice playback off" : "Turn voice playback on"}
         >
-          <Mic className={`h-10 w-10 ${isListening ? "text-[#FF9500]" : "text-[#00E5FF]"}`} />
+          {ttsEnabled ? <Volume2 className="h-[18px] w-[18px]" /> : <VolumeX className="h-[18px] w-[18px]" />}
         </button>
+        <button
+          type="button"
+          onClick={onClose}
+          className="carvis-control-btn"
+          aria-label="Close voice interface"
+        >
+          <X className="h-[18px] w-[18px]" />
+        </button>
+      </div>
 
-        <p className="font-mono-data mt-5 text-[11px] tracking-wide text-[#7d99aa]">
-          {!speechSupported ? "SPEECH RECOGNITION IS NOT SUPPORTED" : isListening ? "LISTENING - RELEASE TO SEND" : isLoading ? "PROCESSING" : "PRESS AND HOLD TO SPEAK"}
-        </p>
+      <button
+        type="button"
+        className="absolute inset-0 z-10 touch-none"
+        aria-label="Press and hold to speak"
+        onPointerDown={startListening}
+        onPointerUp={stopListening}
+        onPointerCancel={stopListening}
+        onPointerLeave={stopListening}
+        disabled={isLoading || !speechSupported}
+      />
 
-        {transcript && (
-          <div className="mt-8 w-full">
-            <p className="font-orbitron mb-2 text-[10px] tracking-[0.2em] text-[#7d99aa]">INPUT</p>
-            <div className="rounded-lg border border-[#00B4FF]/15 bg-[#0A1520]/70 p-4">
-              <p className="font-rajdhani text-sm leading-relaxed text-[#e8f4f8]">{transcript}</p>
-            </div>
-          </div>
-        )}
+      {(transcript || response) && (
+        <div className="pointer-events-none absolute left-1/2 top-16 z-20 w-full max-w-lg -translate-x-1/2 px-6">
+          {transcript && (
+            <p className="carvis-transcript mb-2 text-center text-sm">{transcript}</p>
+          )}
+          {response && (
+            <p className="carvis-response text-center text-sm">{response}</p>
+          )}
+        </div>
+      )}
 
-        {response && (
-          <div className="mt-4 w-full">
-            <p className="font-orbitron mb-2 text-[10px] tracking-[0.2em] text-[#00B4FF]">JARVIS</p>
-            <div className="rounded-lg border border-[#00B4FF]/20 bg-[#0A1520]/70 p-4">
-              <p className="font-rajdhani text-sm leading-relaxed text-[#e8f4f8]">{response}</p>
-            </div>
-          </div>
-        )}
+      <div className="carvis-status pointer-events-none absolute bottom-10 left-1/2 z-20 -translate-x-1/2">
+        {statusText}
+      </div>
+      <div className="carvis-label pointer-events-none absolute bottom-4 left-1/2 z-20 -translate-x-1/2">
+        CARVIS
       </div>
     </div>
   );

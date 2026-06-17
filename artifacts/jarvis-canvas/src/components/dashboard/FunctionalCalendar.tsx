@@ -67,7 +67,7 @@ export default function FunctionalCalendar({ assignments, referenceDate = new Da
       case "overdue": return "bg-[#FF4D4D]";
       case "urgent": return "bg-[#FF9500]";
       case "warning": return "bg-[#FF9500]/60";
-      case "safe": return "bg-[#00B4FF]";
+      case "safe": return "bg-[#FF4444]";
       default: return "bg-[#5a7a8a]";
     }
   };
@@ -77,14 +77,14 @@ export default function FunctionalCalendar({ assignments, referenceDate = new Da
   return (
     <div className="w-full">
       <div className="mb-4 flex items-center justify-between">
-        <button onClick={() => setWeekOffset((w) => w - 1)} className="hud-arrow text-[#7d99aa] hover:text-[#00E5FF]">
+        <button onClick={() => setWeekOffset((w) => w - 1)} className="hud-arrow text-[rgba(245,245,245,0.45)] hover:text-[#FF4444]">
           <ChevronLeft className="h-4 w-4" />
         </button>
         <span className="font-mono-data text-[11px] tracking-wide text-[#7d99aa]">
           {days[0].toLocaleDateString("en-US", { month: "short", day: "numeric" }).toUpperCase()} -{" "}
           {days[6].toLocaleDateString("en-US", { month: "short", day: "numeric" }).toUpperCase()}
         </span>
-        <button onClick={() => setWeekOffset((w) => w + 1)} className="hud-arrow text-[#7d99aa] hover:text-[#00E5FF]">
+        <button onClick={() => setWeekOffset((w) => w + 1)} className="hud-arrow text-[rgba(245,245,245,0.45)] hover:text-[#FF4444]">
           <ChevronRight className="h-4 w-4" />
         </button>
       </div>
@@ -102,10 +102,10 @@ export default function FunctionalCalendar({ assignments, referenceDate = new Da
               className={`hud-timeline-day min-h-[104px] cursor-pointer p-2 text-left transition-all duration-200 ${todayFlag ? "today" : ""} ${pastFlag && !todayFlag ? "opacity-55" : ""}`}
             >
               <div className="mb-2 flex items-center justify-between">
-                <span className={`font-orbitron text-[10px] tracking-wider ${todayFlag ? "font-bold text-[#00E5FF]" : "text-[#7d99aa]"}`}>
+                <span className={`font-orbitron text-[10px] tracking-wider ${todayFlag ? "font-bold text-[#FF4444]" : "text-[rgba(245,245,245,0.45)]"}`}>
                   {dayNames[index]}
                 </span>
-                <span className={`font-mono-data text-[11px] ${todayFlag ? "font-bold text-[#00E5FF]" : "text-[#7d99aa]"}`}>
+                <span className={`font-mono-data text-[11px] ${todayFlag ? "font-bold text-[#FF4444]" : "text-[rgba(245,245,245,0.45)]"}`}>
                   {date.getDate()}
                 </span>
               </div>
@@ -130,12 +130,12 @@ export default function FunctionalCalendar({ assignments, referenceDate = new Da
       </div>
 
       {selectedDay && (
-        <div className="mt-4 rounded-lg border border-[#00B4FF]/20 bg-[#0A1520]/80 p-4">
+        <div className="mt-4 rounded-lg border border-[rgba(160,21,21,0.25)] bg-[#0a0000]/80 p-4">
           <div className="mb-3 flex items-center justify-between gap-3">
-            <h3 className="font-orbitron text-xs font-bold tracking-[0.15em] text-[#00B4FF]">
+            <h3 className="font-orbitron text-xs font-bold tracking-[0.15em] text-[#FF4444]">
               {selectedDay.toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" }).toUpperCase()}
             </h3>
-            <button onClick={() => setSelectedDay(null)} className="font-mono-data text-[10px] text-[#7d99aa] transition hover:text-[#00E5FF]">CLOSE</button>
+            <button onClick={() => setSelectedDay(null)} className="font-mono-data text-[10px] text-[rgba(245,245,245,0.45)] transition hover:text-[#FF4444]">CLOSE</button>
           </div>
           <div className="space-y-2">
             {getDayAssignments(selectedDay).length > 0 ? (
