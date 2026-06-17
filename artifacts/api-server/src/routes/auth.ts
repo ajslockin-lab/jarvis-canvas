@@ -71,7 +71,7 @@ router.post("/auth/canvas/start", async (req, res) => {
 router.get("/auth/canvas", async (req, res) => {
   try {
     const { code, state, error: oauthError } = req.query as Record<string, string>;
-    const cookies = (req as Request & { cookies?: Record<string, string> }).cookies ?? {};
+    const cookies = (req as unknown as Request & { cookies?: Record<string, string> }).cookies ?? {};
     const storedState = cookies["canvas_oauth_state"];
     const canvasUrl = cookies["canvas_oauth_url"];
     const appUrl = process.env["APP_URL"] || "";
@@ -210,7 +210,7 @@ router.post("/auth/canvas/pat", async (req, res) => {
 });
 
 router.post("/auth/signout", async (req, res) => {
-  const sessionId = (req as Request & { cookies?: Record<string, string> }).cookies?.["jarvis_session"]
+  const sessionId = (req as unknown as Request & { cookies?: Record<string, string> }).cookies?.["jarvis_session"]
     || (req.headers["x-session-token"] as string | undefined);
 
   if (sessionId) {
