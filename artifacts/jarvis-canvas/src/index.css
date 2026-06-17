@@ -6,56 +6,58 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-inter);
+  --font-sans: var(--font-lato);
   --font-mono: var(--font-jetbrains);
-  --font-heading: var(--font-orbitron);
-  --font-body: var(--font-rajdhani);
+  --font-heading: var(--font-lato);
+  --font-body: var(--font-lato);
 }
 
 :root {
-  --background: #050A10;
-  --foreground: #e8f4f8;
-  --card: #0A1520;
-  --card-foreground: #e8f4f8;
-  --popover: #0A1520;
-  --popover-foreground: #e8f4f8;
-  --primary: #00B4FF;
-  --primary-foreground: #050A10;
-  --secondary: #0A1520;
-  --secondary-foreground: #e8f4f8;
-  --muted: #0A1520;
-  --muted-foreground: #5a7a8a;
-  --accent: #00E5FF;
-  --accent-foreground: #050A10;
-  --destructive: #FF4D4D;
-  --border: rgba(0, 180, 255, 0.15);
-  --input: rgba(0, 180, 255, 0.15);
-  --ring: #00B4FF;
-  --radius: 0.25rem;
-  --font-orbitron: "Segoe UI", system-ui, sans-serif;
+  --background: #000000;
+  --foreground: #f5f5f5;
+  --card: #0a0000;
+  --card-foreground: #f5f5f5;
+  --popover: #0a0000;
+  --popover-foreground: #f5f5f5;
+  --primary: #ff4444;
+  --primary-foreground: #000000;
+  --secondary: #0a0000;
+  --secondary-foreground: #f5f5f5;
+  --muted: #0a0000;
+  --muted-foreground: rgba(245, 245, 245, 0.4);
+  --accent: #ff6b3d;
+  --accent-foreground: #000000;
+  --destructive: #ef4444;
+  --border: rgba(160, 21, 21, 0.2);
+  --input: rgba(160, 21, 21, 0.2);
+  --ring: #ff4444;
+  --radius: 0.5rem;
+  --font-lato: "Lato", -apple-system, BlinkMacSystemFont, sans-serif;
   --font-jetbrains: "Cascadia Mono", "Consolas", monospace;
-  --font-rajdhani: "Segoe UI", system-ui, sans-serif;
-  --font-inter: "Segoe UI", system-ui, sans-serif;
+  --carvis-red: #ff4444;
+  --carvis-red-dim: #a01515;
+  --carvis-red-glow: #ff1e1e;
+  --carvis-orange: #ff6b3d;
 }
 
 @layer base {
   * {
-    border-color: rgba(0, 180, 255, 0.15);
+    border-color: rgba(160, 21, 21, 0.2);
   }
   body {
-    background: #050A10;
-    color: #e8f4f8;
-    font-family: var(--font-inter), system-ui, sans-serif;
+    background: #000000;
+    color: #f5f5f5;
+    font-family: var(--font-lato), system-ui, sans-serif;
   }
 }
 
-/* ========== HUD GLOBAL STYLES ========== */
+/* ========== CARVIS HUD GLOBAL STYLES ========== */
 
 .hud-bg {
   background:
-    radial-gradient(circle at 20% 0%, rgba(0, 180, 255, 0.08), transparent 28rem),
-    radial-gradient(circle at 100% 15%, rgba(0, 255, 136, 0.06), transparent 24rem),
-    #06101a;
+    radial-gradient(circle at 20% 0%, rgba(255, 30, 30, 0.08), transparent 28rem),
+    radial-gradient(circle at 100% 15%, rgba(255, 68, 68, 0.05), transparent 24rem),
+    #000000;
   position: relative;
   min-height: 100vh;
 }
@@ -67,8 +69,8 @@
   pointer-events: none;
   z-index: 1;
   background-image:
-    linear-gradient(rgba(0, 180, 255, 0.03) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(0, 180, 255, 0.03) 1px, transparent 1px);
+    linear-gradient(rgba(160, 21, 21, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(160, 21, 21, 0.04) 1px, transparent 1px);
   background-size: 40px 40px;
   opacity: 0.55;
   mask-image: radial-gradient(ellipse at center, black 60%, transparent 100%);
@@ -94,7 +96,7 @@
   left: 0;
   right: 0;
   height: 2px;
-  background: linear-gradient(90deg, transparent, rgba(0, 180, 255, 0.2), transparent);
+  background: linear-gradient(90deg, transparent, rgba(255, 68, 68, 0.2), transparent);
   animation: scanline 8s linear infinite;
 }
 
@@ -105,11 +107,11 @@
 
 .hud-panel {
   position: relative;
-  background: rgba(9, 18, 29, 0.88);
-  border: 1px solid rgba(130, 176, 206, 0.18);
+  background: rgba(5, 0, 0, 0.88);
+  border: 1px solid rgba(160, 21, 21, 0.18);
   border-radius: 8px;
   backdrop-filter: blur(12px);
-  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.22);
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.35);
 }
 
 .hud-panel > .corner-br {
@@ -126,7 +128,7 @@
   position: absolute;
   width: 12px;
   height: 12px;
-  border-color: rgba(0, 180, 255, 0.4);
+  border-color: rgba(255, 68, 68, 0.35);
   border-style: solid;
   pointer-events: none;
   transition: border-color 0.3s ease;
@@ -162,49 +164,51 @@
   content: '';
   flex: 1;
   height: 1px;
-  background: linear-gradient(90deg, rgba(0, 180, 255, 0.3) 0%, transparent 80%);
+  background: linear-gradient(90deg, rgba(255, 68, 68, 0.3) 0%, transparent 80%);
   margin-left: 0.5rem;
 }
 
 .hud-card {
-  border: 1px solid rgba(0, 180, 255, 0.12);
-  background: rgba(9, 18, 29, 0.7);
+  border: 1px solid rgba(160, 21, 21, 0.15);
+  background: rgba(5, 0, 0, 0.7);
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
 .hud-card:hover {
-  border-color: rgba(0, 180, 255, 0.3);
-  box-shadow: 0 0 20px rgba(0, 180, 255, 0.05);
+  border-color: rgba(255, 68, 68, 0.3);
+  box-shadow: 0 0 20px rgba(255, 30, 30, 0.06);
 }
 
 .hud-btn {
-  font-family: var(--font-orbitron), system-ui, sans-serif;
+  font-family: var(--font-lato), system-ui, sans-serif;
   font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.15em;
   text-transform: uppercase;
-  border: 1px solid rgba(0, 180, 255, 0.3);
-  background: rgba(0, 180, 255, 0.05);
-  color: #7d99aa;
+  border: 1px solid rgba(160, 21, 21, 0.3);
+  background: rgba(255, 30, 30, 0.05);
+  color: rgba(255, 68, 68, 0.55);
   cursor: pointer;
   transition: all 0.2s ease;
+  border-radius: 6px;
 }
 
 .hud-btn:hover {
-  border-color: rgba(0, 229, 255, 0.5);
-  color: #00E5FF;
-  background: rgba(0, 180, 255, 0.1);
+  border-color: rgba(255, 68, 68, 0.5);
+  color: rgba(255, 68, 68, 0.9);
+  background: rgba(255, 30, 30, 0.1);
+  box-shadow: 0 0 10px rgba(255, 30, 30, 0.1);
 }
 
 .hud-btn-primary {
-  border-color: rgba(0, 180, 255, 0.5);
-  background: rgba(0, 180, 255, 0.1);
-  color: #00E5FF;
+  border-color: rgba(255, 68, 68, 0.5);
+  background: rgba(255, 30, 30, 0.1);
+  color: rgba(255, 68, 68, 0.85);
 }
 
 .hud-btn-primary:hover {
-  border-color: rgba(0, 229, 255, 0.8);
-  background: rgba(0, 180, 255, 0.18);
+  border-color: rgba(255, 68, 68, 0.8);
+  background: rgba(255, 30, 30, 0.18);
 }
 
 .hud-gear {
@@ -212,7 +216,7 @@
 }
 
 .hud-gear:hover {
-  filter: drop-shadow(0 0 8px rgba(0, 229, 255, 0.4));
+  filter: drop-shadow(0 0 8px rgba(255, 68, 68, 0.35));
 }
 
 @keyframes sync-spin {
@@ -225,18 +229,18 @@
 }
 
 .hud-alert {
-  border: 1px solid rgba(0, 180, 255, 0.15);
-  background: rgba(9, 18, 29, 0.6);
+  border: 1px solid rgba(160, 21, 21, 0.15);
+  background: rgba(5, 0, 0, 0.6);
 }
 
 .hud-alert-urgent {
-  border-color: rgba(255, 149, 0, 0.3);
-  background: rgba(255, 149, 0, 0.05);
+  border-color: rgba(255, 107, 61, 0.3);
+  background: rgba(255, 107, 61, 0.05);
 }
 
 .hud-bar-track {
   height: 4px;
-  background: rgba(0, 180, 255, 0.1);
+  background: rgba(160, 21, 21, 0.15);
   overflow: hidden;
 }
 
@@ -246,38 +250,38 @@
 }
 
 .hud-badge-green {
-  background: rgba(0, 255, 136, 0.12);
-  border: 1px solid rgba(0, 255, 136, 0.3);
-  color: #00FF88;
+  background: rgba(34, 197, 94, 0.12);
+  border: 1px solid rgba(34, 197, 94, 0.3);
+  color: #22c55e;
 }
 
 .hud-badge-amber {
-  background: rgba(255, 149, 0, 0.12);
-  border: 1px solid rgba(255, 149, 0, 0.3);
-  color: #FF9500;
+  background: rgba(255, 107, 61, 0.12);
+  border: 1px solid rgba(255, 107, 61, 0.3);
+  color: #ff6b3d;
 }
 
 .hud-badge-red {
-  background: rgba(255, 77, 77, 0.12);
-  border: 1px solid rgba(255, 77, 77, 0.3);
-  color: #FF4D4D;
+  background: rgba(239, 68, 68, 0.12);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  color: #ef4444;
 }
 
 .hud-timeline-day {
-  border: 1px solid rgba(0, 180, 255, 0.1);
-  background: rgba(9, 18, 29, 0.6);
+  border: 1px solid rgba(160, 21, 21, 0.12);
+  background: rgba(5, 0, 0, 0.6);
   transition: all 0.2s ease;
 }
 
 .hud-timeline-day:hover {
-  border-color: rgba(0, 180, 255, 0.3);
-  background: rgba(0, 180, 255, 0.05);
+  border-color: rgba(255, 68, 68, 0.3);
+  background: rgba(255, 30, 30, 0.05);
 }
 
 .hud-timeline-day.today {
-  border-color: rgba(0, 229, 255, 0.4);
-  background: rgba(0, 229, 255, 0.05);
-  box-shadow: 0 0 12px rgba(0, 229, 255, 0.1);
+  border-color: rgba(255, 68, 68, 0.4);
+  background: rgba(255, 30, 30, 0.05);
+  box-shadow: 0 0 12px rgba(255, 68, 68, 0.1);
 }
 
 .hud-arrow {
@@ -289,20 +293,20 @@
   transition: color 0.2s ease;
 }
 
-.font-orbitron { font-family: var(--font-orbitron), system-ui, sans-serif; }
-.font-rajdhani { font-family: var(--font-rajdhani), system-ui, sans-serif; }
+.font-orbitron { font-family: var(--font-lato), system-ui, sans-serif; font-weight: 700; letter-spacing: 0.12em; }
+.font-rajdhani { font-family: var(--font-lato), system-ui, sans-serif; }
 .font-mono-data { font-family: var(--font-jetbrains), monospace; }
 
 @keyframes arc-pulse {
-  0%, 100% { box-shadow: 0 0 20px rgba(0, 229, 255, 0.15), inset 0 0 20px rgba(0, 229, 255, 0.05); }
-  50% { box-shadow: 0 0 40px rgba(0, 229, 255, 0.3), inset 0 0 30px rgba(0, 229, 255, 0.1); }
+  0%, 100% { box-shadow: 0 0 20px rgba(255, 68, 68, 0.15), inset 0 0 20px rgba(255, 30, 30, 0.05); }
+  50% { box-shadow: 0 0 40px rgba(255, 68, 68, 0.3), inset 0 0 30px rgba(255, 30, 30, 0.1); }
 }
 
 .arc-reactor-btn {
-  border: 2px solid rgba(0, 229, 255, 0.4);
-  background: rgba(0, 180, 255, 0.08);
-  color: #00E5FF;
-  font-family: var(--font-orbitron), system-ui, sans-serif;
+  border: 2px solid rgba(255, 68, 68, 0.4);
+  background: rgba(255, 30, 30, 0.08);
+  color: rgba(255, 68, 68, 0.9);
+  font-family: var(--font-lato), system-ui, sans-serif;
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.12em;
@@ -310,13 +314,13 @@
   transition: all 0.3s ease;
   animation: arc-pulse 3s ease-in-out infinite;
   cursor: pointer;
-  border-radius: 4px;
+  border-radius: 8px;
 }
 
 .arc-reactor-btn:hover {
-  border-color: rgba(0, 229, 255, 0.8);
-  background: rgba(0, 180, 255, 0.15);
-  box-shadow: 0 0 40px rgba(0, 229, 255, 0.3);
+  border-color: rgba(255, 68, 68, 0.8);
+  background: rgba(255, 30, 30, 0.15);
+  box-shadow: 0 0 40px rgba(255, 68, 68, 0.25);
 }
 
 .fade-in {
@@ -328,4 +332,65 @@
 .fade-in.visible {
   opacity: 1;
   transform: translateY(0);
+}
+
+/* ========== CARVIS VOICE INTERFACE ========== */
+
+.carvis-voice {
+  font-family: var(--font-lato), sans-serif;
+}
+
+.carvis-control-btn {
+  width: 36px;
+  height: 36px;
+  border: 1px solid rgba(160, 21, 21, 0.25);
+  border-radius: 8px;
+  background: rgba(255, 30, 30, 0.04);
+  color: rgba(255, 68, 68, 0.45);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.carvis-control-btn:hover {
+  background: rgba(255, 30, 30, 0.1);
+  color: rgba(255, 68, 68, 0.8);
+  border-color: rgba(255, 30, 30, 0.4);
+  box-shadow: 0 0 8px rgba(255, 30, 30, 0.15);
+}
+
+.carvis-control-btn.muted {
+  color: rgba(160, 21, 21, 0.5);
+  border-color: rgba(160, 21, 21, 0.2);
+}
+
+.carvis-status {
+  color: rgba(255, 68, 68, 0.55);
+  font-size: 13px;
+  letter-spacing: 2px;
+  text-transform: lowercase;
+  font-weight: 300;
+  transition: opacity 0.5s ease;
+}
+
+.carvis-label {
+  color: rgba(160, 21, 21, 0.4);
+  font-size: 10px;
+  letter-spacing: 5px;
+  text-transform: uppercase;
+  font-weight: 700;
+}
+
+.carvis-transcript {
+  color: rgba(245, 245, 245, 0.55);
+  letter-spacing: 0.3px;
+  font-weight: 300;
+}
+
+.carvis-response {
+  color: rgba(255, 68, 68, 0.75);
+  letter-spacing: 0.3px;
+  font-weight: 400;
 }

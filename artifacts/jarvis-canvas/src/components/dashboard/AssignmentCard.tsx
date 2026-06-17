@@ -25,7 +25,7 @@ export default function AssignmentCard({
     if (hours < 0) return { color: "text-[#FF4D4D]", dot: "bg-[#FF4D4D]", border: "border-[#FF4D4D]/30" };
     if (hours < 24) return { color: "text-[#FF9500]", dot: "bg-[#FF9500]", border: "border-[#FF9500]/30" };
     if (hours < 72) return { color: "text-[#FF9500]/70", dot: "bg-[#FF9500]/70", border: "border-[#FF9500]/15" };
-    return { color: "text-[#00B4FF]", dot: "bg-[#00B4FF]", border: "border-[#00B4FF]/15" };
+    return { color: "text-[#FF4444]", dot: "bg-[#FF4444]", border: "border-[#FF4444]/15" };
   };
 
   const due = dueDate ? new Date(dueDate) : null;
@@ -64,7 +64,7 @@ export default function AssignmentCard({
     <div className={`hud-card group ${isCompleted ? "opacity-60" : ""}`}>
       <div
         className="p-4 h-full flex flex-col"
-        style={{ borderLeft: isCompleted ? "2px solid #00FF88" : isOverdue ? "2px solid #FF4D4D" : isUrgent ? "2px solid #FF9500" : "2px solid #00B4FF" }}
+        style={{ borderLeft: isCompleted ? "2px solid #22c55e" : isOverdue ? "2px solid #ef4444" : isUrgent ? "2px solid #FF6B3D" : "2px solid #FF4444" }}
       >
         <div className="flex items-start justify-between gap-3 mb-2">
           <div className="flex items-start gap-2 min-w-0">
@@ -78,7 +78,7 @@ export default function AssignmentCard({
             <h3 className={`font-orbitron text-[13px] font-bold leading-tight truncate ${isCompleted ? "text-[#5a7a8a] line-through" : "text-[#e8f4f8]"}`}>{name}</h3>
           </div>
           {url && (
-            <a href={url} target="_blank" rel="noopener noreferrer" className="text-[#5a7a8a] hover:text-[#00E5FF] transition opacity-0 group-hover:opacity-100 shrink-0">
+            <a href={url} target="_blank" rel="noopener noreferrer" className="text-[rgba(245,245,245,0.35)] hover:text-[#FF4444] transition opacity-0 group-hover:opacity-100 shrink-0">
               <ExternalLink className="w-3.5 h-3.5" />
             </a>
           )}
@@ -90,7 +90,7 @@ export default function AssignmentCard({
 
         <div className="flex-1" />
 
-        <div className="flex items-center justify-between mt-2 pt-2 border-t border-[#00B4FF]/5">
+        <div className="flex items-center justify-between mt-2 pt-2 border-t border-[rgba(160,21,21,0.1)]">
           <span className={`font-mono-data text-[11px] font-bold ${isCompleted ? "text-[#00FF88]" : isOverdue ? "text-[#FF4D4D]" : urgency.color}`}>
             {isCompleted ? "DONE" : isOverdue ? `OVERDUE ${Math.abs(hoursLeft!)}H` : isUrgent ? `DUE ${hoursLeft}H` : `${dueText} ${dueTime}`}
           </span>

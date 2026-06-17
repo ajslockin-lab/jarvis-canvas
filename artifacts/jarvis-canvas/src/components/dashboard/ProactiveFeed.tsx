@@ -14,7 +14,7 @@ interface ProactiveAlert {
 
 const iconFor: Record<string, React.ReactNode> = {
   deadline: <Clock className="w-4 h-4 text-[#FF9500]" />,
-  grade: <Zap className="w-4 h-4 text-[#00B4FF]" />,
+  grade: <Zap className="w-4 h-4 text-[#FF4444]" />,
   suggestion: <Sparkles className="w-4 h-4 text-[#00FF88]" />,
   warning: <AlertTriangle className="w-4 h-4 text-[#FF4D4D]" />,
 };
@@ -151,7 +151,7 @@ export default function ProactiveFeed({ maxItems = 3 }: { maxItems?: number }) {
               <h4 className="font-orbitron text-[11px] font-bold tracking-[0.1em] text-[#e8f4f8] mb-1">{alert.title}</h4>
               <p className="font-rajdhani text-[13px] text-[#5a7a8a] leading-relaxed">{alert.message}</p>
               {alert.action && alert.actionLabel && (
-                <a href={alert.action} className="mt-2 font-mono-data text-[11px] text-[#00B4FF] hover:text-[#00E5FF] font-bold transition tracking-wide inline-block">
+                <a href={alert.action} className="mt-2 font-mono-data text-[11px] text-[#FF4444] hover:text-[#FF6B3D] font-bold transition tracking-wide inline-block">
                   {alert.actionLabel}
                 </a>
               )}
