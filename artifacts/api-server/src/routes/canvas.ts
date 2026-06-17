@@ -17,6 +17,14 @@ function letterGrade(score: number | null): string | null {
   return "F";
 }
 
+function scopedCourseId(userId: string, canvasCourseId: string) {
+  return `${userId}__c${canvasCourseId}`;
+}
+
+function scopedAssignmentId(scopedCourse: string, canvasAssignmentId: string) {
+  return `${scopedCourse}__a${canvasAssignmentId}`;
+}
+
 router.post("/canvas/sync", async (req, res) => {
   const user = await requireAuth(req, res);
   if (!user) return;
@@ -34,9 +42,14 @@ router.post("/canvas/sync", async (req, res) => {
 
     for (const c of rawCourses) {
       if (!c["id"] || c["workflow_state"] !== "available") continue;
-      const courseId = String(c["id"]);
+      const courseId = scopedCourseId(user.id, String(c["id"]));
 
-      const [existing] = await db.select({ id: coursesTable.id }).from(coursesTable).where(eq(coursesTable.id, courseId)).limit(1);
+      const [existing] = await db
+        .select({ id: coursesTable.id })
+        .from(coursesTable)
+        .where(and(eq(coursesTable.id, courseId), eq(coursesTable.userId, user.id)))
+        .limit(1);
+
       const courseData = {
         userId: user.id,
         name: String(c["name"] || "Untitled Course"),
@@ -46,18 +59,23 @@ router.post("/canvas/sync", async (req, res) => {
       };
 
       if (existing) {
-        await db.update(coursesTable).set(courseData).where(eq(coursesTable.id, courseId));
+        await db.update(coursesTable).set(courseData).where(and(eq(coursesTable.id, courseId), eq(coursesTable.userId, user.id)));
       } else {
         await db.insert(coursesTable).values({ id: courseId, ...courseData });
       }
       courseCount++;
 
       try {
-        const rawAssignments = await fetchCanvasAssignments(token, user.canvasBaseUrl, courseId) as Record<string, unknown>[];
+        const rawAssignments = await fetchCanvasAssignments(token, user.canvasBaseUrl, String(c["id"])) as Record<string, unknown>[];
         for (const a of rawAssignments) {
           if (!a["id"]) continue;
-          const assignmentId = String(a["id"]);
-          const [existingA] = await db.select({ id: assignmentsTable.id }).from(assignmentsTable).where(eq(assignmentsTable.id, assignmentId)).limit(1);
+          const assignmentId = scopedAssignmentId(courseId, String(a["id"]));
+          const [existingA] = await db
+            .select({ id: assignmentsTable.id })
+            .from(assignmentsTable)
+            .where(eq(assignmentsTable.id, assignmentId))
+            .limit(1);
+
           const assignmentData = {
             courseId,
             name: String(a["name"] || "Untitled Assignment"),
@@ -82,15 +100,30 @@ router.post("/canvas/sync", async (req, res) => {
       try {
         const enrollments = await fetchEnrollmentsWithGrades(token, user.canvasBaseUrl, user.canvasUserId);
         for (const eg of enrollments) {
-          const [course] = await db.select({ id: coursesTable.id }).from(coursesTable).where(and(eq(coursesTable.id, eg.courseId), eq(coursesTable.userId, user.id))).limit(1);
+          const scopedCourse = scopedCourseId(user.id, eg.courseId);
+          const [course] = await db
+            .select({ id: coursesTable.id })
+            .from(coursesTable)
+            .where(and(eq(coursesTable.id, scopedCourse), eq(coursesTable.userId, user.id)))
+            .limit(1);
           if (!course) continue;
-          const [existingGrade] = await db.select({ id: gradesTable.id }).from(gradesTable)
-            .where(and(eq(gradesTable.userId, user.id), eq(gradesTable.courseId, eg.courseId))).limit(1);
-          const gradeData = { currentScore: eg.currentScore, finalScore: eg.finalScore, letterGrade: letterGrade(eg.currentScore), fetchedAt: new Date() };
+
+          const [existingGrade] = await db
+            .select({ id: gradesTable.id })
+            .from(gradesTable)
+            .where(and(eq(gradesTable.userId, user.id), eq(gradesTable.courseId, scopedCourse)))
+            .limit(1);
+
+          const gradeData = {
+            currentScore: eg.currentScore,
+            finalScore: eg.finalScore,
+            letterGrade: letterGrade(eg.currentScore),
+            fetchedAt: new Date(),
+          };
           if (existingGrade) {
             await db.update(gradesTable).set(gradeData).where(eq(gradesTable.id, existingGrade.id));
           } else {
-            await db.insert(gradesTable).values({ userId: user.id, courseId: eg.courseId, ...gradeData });
+            await db.insert(gradesTable).values({ userId: user.id, courseId: scopedCourse, ...gradeData });
           }
         }
       } catch (err) {
