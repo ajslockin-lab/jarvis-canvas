@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback } from "react";
 import { Mic, X, Sparkles, Loader2, ChevronLeft, ChevronRight, ChevronDown, ChevronUp } from "lucide-react";
 
+const SESSION_KEY = "jarvis_session_token";
+
 interface Assignment {
   id: string;
   name: string;
@@ -24,27 +26,33 @@ interface Grade {
 export default function ExtensionOverlay() {
   const [pos, setPos] = useState({ x: 0, y: 0 });
   const [mounted, setMounted] = useState(false);
-  const [authEmail, setAuthEmail] = useState<string | null>(null);
+  const [sessionToken, setSessionToken] = useState<string | null>(null);
 
   useEffect(() => {
-    const cookieMatch = document.cookie.match(/(?:^|;\s*)canvas_user_email=([^;]*)/);
-    if (cookieMatch) setAuthEmail(decodeURIComponent(cookieMatch[1]));
+    const stored = localStorage.getItem(SESSION_KEY);
+    if (stored) setSessionToken(stored);
 
     const params = new URLSearchParams(window.location.search);
-    const emailParam = params.get("email");
-    if (emailParam) setAuthEmail(decodeURIComponent(emailParam));
+    const tokenParam = params.get("session_token");
+    if (tokenParam) {
+      setSessionToken(tokenParam);
+      localStorage.setItem(SESSION_KEY, tokenParam);
+    }
 
     const channel = new BroadcastChannel("jarvis-auth");
     channel.onmessage = (event) => {
-      if (event.data?.type === "auth-success" && event.data.email) setAuthEmail(event.data.email);
+      if (event.data?.type === "auth-success" && event.data.sessionToken) {
+        setSessionToken(event.data.sessionToken);
+        localStorage.setItem(SESSION_KEY, event.data.sessionToken);
+      }
     };
     return () => channel.close();
   }, []);
 
   const authHeaders = useCallback((): Record<string, string> => {
-    if (!authEmail) return {};
-    return { "X-Auth-Email": encodeURIComponent(authEmail) };
-  }, [authEmail]);
+    if (!sessionToken) return {};
+    return { "X-Session-Token": sessionToken };
+  }, [sessionToken]);
 
   useEffect(() => {
     if (!mounted) {
@@ -69,20 +77,19 @@ export default function ExtensionOverlay() {
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
   const [authed, setAuthed] = useState(false);
 
-  const fetchData = useCallback((useAuthHeader = true) => {
+  const fetchData = useCallback(() => {
     setLoading(true);
-    const headers = useAuthHeader && authEmail ? { "X-Auth-Email": encodeURIComponent(authEmail) } as Record<string, string> : {};
-    fetch("/api/user/data", { headers })
+    const headers = authHeaders();
+    fetch("/api/user/data", { headers, credentials: "include" })
       .then((r) => { if (r.status === 401) { setAuthed(false); return null; } setAuthed(true); return r.json(); })
       .then((data) => {
         if (!data) return;
         setCourses(Array.isArray(data.courses) ? data.courses as Course[] : []);
-        if (data.user?.email) setAuthEmail(data.user.email);
       })
       .catch(() => setCourses([]))
       .finally(() => setLoading(false));
 
-    fetch("/api/canvas/grades", { headers })
+    fetch("/api/canvas/grades", { headers, credentials: "include" })
       .then((r) => r.json())
       .then((data) => {
         if (Array.isArray(data.grades)) {
@@ -90,10 +97,10 @@ export default function ExtensionOverlay() {
         }
       })
       .catch(() => setGrades([]));
-  }, [authEmail]);
+  }, [authHeaders]);
 
-  useEffect(() => { fetchData(false); }, [fetchData]);
-  useEffect(() => { if (authEmail) fetchData(true); }, [authEmail]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { fetchData(); }, [fetchData]);
+  useEffect(() => { if (sessionToken) fetchData(); }, [sessionToken]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     setDragOffset({ x: e.clientX - pos.x, y: e.clientY - pos.y });
@@ -134,6 +141,7 @@ export default function ExtensionOverlay() {
       const res = await fetch("/api/voice/command", {
         method: "POST",
         headers: { "Content-Type": "application/json", ...authHeaders() },
+        credentials: "include",
         body: JSON.stringify({ text: textPrompt }),
       });
       const data = await res.json();
@@ -174,8 +182,11 @@ export default function ExtensionOverlay() {
     const handleConnect = () => {
       window.open("/signin", "_blank");
       const interval = setInterval(() => {
-        const headers: Record<string, string> = authEmail ? { "X-Auth-Email": encodeURIComponent(authEmail) } : {};
-        fetch("/api/user/data", { headers }).then((r) => { if (r.status !== 401) { clearInterval(interval); fetchData(true); } }).catch(() => {});
+        const token = localStorage.getItem(SESSION_KEY);
+        const headers: Record<string, string> = token ? { "X-Session-Token": token } : {};
+        fetch("/api/user/data", { headers, credentials: "include" })
+          .then((r) => { if (r.status !== 401) { clearInterval(interval); fetchData(); } })
+          .catch(() => {});
       }, 2000);
       setTimeout(() => clearInterval(interval), 300000);
     };

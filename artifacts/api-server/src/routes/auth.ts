@@ -1,13 +1,24 @@
 import { Router } from "express";
 import { randomBytes } from "crypto";
 import { db } from "@workspace/db";
-import { usersTable } from "@workspace/db/schema";
+import { usersTable, sessionsTable } from "@workspace/db/schema";
 import { eq } from "drizzle-orm";
-import { encrypt, decrypt } from "../lib/crypto.js";
+import { encrypt } from "../lib/crypto.js";
 import { fetchCanvasUser } from "../lib/canvas-fetch.js";
 import { z } from "zod";
 
 const router = Router();
+
+const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+
+function createSessionCookie(res: import("express").Response, sessionId: string) {
+  res.cookie("jarvis_session", sessionId, {
+    httpOnly: true,
+    sameSite: "lax",
+    maxAge: SESSION_TTL_MS,
+    path: "/",
+  });
+}
 
 const canvasUrlSchema = z.object({
   canvasUrl: z
@@ -87,14 +98,20 @@ router.post("/auth/canvas/pat", async (req, res) => {
       await db.insert(usersTable).values({ id: userId, ...userData });
     }
 
-    res.cookie("canvas_user_email", encodeURIComponent(email), {
-      httpOnly: true,
-      sameSite: "lax",
-      maxAge: 30 * 24 * 60 * 60 * 1000,
-      path: "/",
+    const sessionId = randomBytes(32).toString("hex");
+    await db.insert(sessionsTable).values({
+      id: sessionId,
+      userId,
+      expiresAt: new Date(Date.now() + SESSION_TTL_MS),
     });
 
-    res.json({ success: true, user: { id: userId, email, name: canvasUser.name } });
+    createSessionCookie(res, sessionId);
+
+    res.json({
+      success: true,
+      user: { id: userId, email, name: canvasUser.name },
+      sessionToken: sessionId,
+    });
   } catch (err) {
     console.error("Canvas PAT auth error:", err);
     const msg = err instanceof Error ? err.message : "Connection failed";
@@ -107,7 +124,14 @@ router.post("/auth/canvas/pat", async (req, res) => {
 });
 
 router.post("/auth/signout", async (req, res) => {
-  res.clearCookie("canvas_user_email", { path: "/" });
+  const sessionId = (req as Request & { cookies?: Record<string, string> }).cookies?.["jarvis_session"]
+    || (req.headers["x-session-token"] as string | undefined);
+
+  if (sessionId) {
+    await db.delete(sessionsTable).where(eq(sessionsTable.id, sessionId));
+  }
+
+  res.clearCookie("jarvis_session", { path: "/" });
   res.json({ success: true });
 });
 

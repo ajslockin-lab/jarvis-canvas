@@ -41,17 +41,8 @@ export default function DashboardPage() {
     try {
       setLoading(true);
       setError(null);
-      const res = await fetch("/api/user/data");
+      const res = await fetch("/api/user/data", { credentials: "include" });
       const data = await res.json();
-
-      const userEmail = data.user?.email;
-      if (userEmail) {
-        try {
-          const channel = new BroadcastChannel("jarvis-auth");
-          channel.postMessage({ type: "auth-success", email: userEmail });
-          channel.close();
-        } catch { /* ignore */ }
-      }
 
       const syncedCourses = Array.isArray(data.courses) ? (data.courses as Course[]) : [];
       if (syncedCourses.length > 0) {
@@ -66,7 +57,7 @@ export default function DashboardPage() {
       }
 
       try {
-        const gradesRes = await fetch("/api/canvas/grades");
+        const gradesRes = await fetch("/api/canvas/grades", { credentials: "include" });
         const gradesData = await gradesRes.json();
         if (Array.isArray(gradesData.grades)) {
           setGrades(gradesData.grades.map((g: { name: string; currentScore: number | null }) => ({
@@ -87,7 +78,7 @@ export default function DashboardPage() {
     setSyncing(true);
     setError(null);
     try {
-      const res = await fetch("/api/canvas/sync", { method: "POST" });
+      const res = await fetch("/api/canvas/sync", { method: "POST", credentials: "include" });
       const data = await res.json();
       if (data.success) {
         setLastSync(new Date().toISOString());

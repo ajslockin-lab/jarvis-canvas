@@ -86,6 +86,7 @@ export default function VoiceInterface({ isOpen, onClose }: VoiceInterfaceProps)
       const res = await fetch("/api/voice/command", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({ text: cleanText }),
       });
       const data = await res.json();

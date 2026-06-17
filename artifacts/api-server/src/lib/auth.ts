@@ -1,7 +1,7 @@
 import type { Request, Response } from "express";
 import { db } from "@workspace/db";
-import { usersTable } from "@workspace/db/schema";
-import { eq } from "drizzle-orm";
+import { usersTable, sessionsTable } from "@workspace/db/schema";
+import { eq, and, gt } from "drizzle-orm";
 import { decrypt } from "./crypto.js";
 
 export interface AuthedUser {
@@ -19,31 +19,41 @@ export async function requireAuth(
   req: Request,
   res: Response
 ): Promise<AuthedUser | null> {
-  let email: string | null = null;
+  let sessionId: string | null = null;
 
-  const authHeader = req.headers["x-auth-email"];
-  if (typeof authHeader === "string" && authHeader) {
-    email = decodeURIComponent(authHeader);
+  const cookie = (req as Request & { cookies?: Record<string, string> }).cookies?.["jarvis_session"];
+  if (cookie) sessionId = cookie;
+
+  if (!sessionId) {
+    const header = req.headers["x-session-token"];
+    if (typeof header === "string" && header) sessionId = header;
   }
 
-  if (!email) {
-    const cookie = (req as Request & { cookies?: Record<string, string> }).cookies?.["canvas_user_email"];
-    if (cookie) email = decodeURIComponent(cookie);
-  }
-
-  if (!email) {
+  if (!sessionId) {
     res.status(401).json({ error: "Unauthorized" });
+    return null;
+  }
+
+  const now = new Date();
+  const [session] = await db
+    .select()
+    .from(sessionsTable)
+    .where(and(eq(sessionsTable.id, sessionId), gt(sessionsTable.expiresAt, now)))
+    .limit(1);
+
+  if (!session) {
+    res.status(401).json({ error: "Session expired or invalid" });
     return null;
   }
 
   const [user] = await db
     .select()
     .from(usersTable)
-    .where(eq(usersTable.email, email))
+    .where(eq(usersTable.id, session.userId))
     .limit(1);
 
   if (!user) {
-    res.status(404).json({ error: "User not found" });
+    res.status(401).json({ error: "User not found" });
     return null;
   }
 

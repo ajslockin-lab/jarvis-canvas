@@ -12,7 +12,7 @@ export default function SettingsPage() {
   const [canvasConnected, setCanvasConnected] = useState(false);
 
   useEffect(() => {
-    fetch("/api/user/data")
+    fetch("/api/user/data", { credentials: "include" })
       .then((r) => r.json())
       .then((data) => setCanvasConnected(!!data.user?.canvasBaseUrl))
       .catch(() => setCanvasConnected(false));
@@ -22,7 +22,7 @@ export default function SettingsPage() {
     setSyncing(true);
     setSyncResult(null);
     try {
-      const res = await fetch("/api/canvas/sync", { method: "POST" });
+      const res = await fetch("/api/canvas/sync", { method: "POST", credentials: "include" });
       const data = await res.json();
       if (data.success) {
         setSyncResult(`Synced ${data.courseCount} courses!`);

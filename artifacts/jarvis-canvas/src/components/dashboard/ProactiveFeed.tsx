@@ -111,7 +111,7 @@ export default function ProactiveFeed({ maxItems = 3 }: { maxItems?: number }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch("/api/user/data")
+    fetch("/api/user/data", { credentials: "include" })
       .then((r) => r.json())
       .then((data) => {
         const courses = Array.isArray(data.courses) ? data.courses : [];

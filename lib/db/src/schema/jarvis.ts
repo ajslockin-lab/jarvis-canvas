@@ -67,6 +67,13 @@ export const conversationsTable = pgTable("conversations", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
+export const sessionsTable = pgTable("sessions", {
+  id: text("id").primaryKey(),
+  userId: text("user_id").notNull().references(() => usersTable.id, { onDelete: "cascade" }),
+  expiresAt: timestamp("expires_at").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
 export const insertUserSchema = createInsertSchema(usersTable).omit({ createdAt: true, updatedAt: true });
 export const insertCourseSchema = createInsertSchema(coursesTable).omit({ createdAt: true });
 export const insertAssignmentSchema = createInsertSchema(assignmentsTable).omit({ createdAt: true, updatedAt: true });
