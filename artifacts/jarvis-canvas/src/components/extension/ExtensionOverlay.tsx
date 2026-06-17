@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { Mic, X, Sparkles, Loader2, ChevronLeft, ChevronRight, Zap, MousePointer, ArrowDown, ArrowUp, Navigation, Eye, Cpu } from "lucide-react";
+import { Mic, X, Sparkles, Loader2, ChevronLeft, ChevronRight, Zap, MousePointer, ArrowDown, ArrowUp, Navigation, Eye, Cpu, Volume2, VolumeX } from "lucide-react";
 
 const SESSION_KEY = "jarvis_session_token";
 const API_BASE = typeof window !== "undefined" && window.location.hostname !== "localhost"
@@ -56,6 +56,7 @@ export default function ExtensionOverlay() {
   const [agentHistory, setAgentHistory] = useState<{ role: "user" | "jarvis"; text: string; action?: AgentAction; blocked?: boolean }[]>([]);
   const [agentLoading, setAgentLoading] = useState(false);
   const [isListening, setIsListening] = useState(false);
+  const [ttsEnabled, setTtsEnabled] = useState(true);
   const [pageContext, setPageContext] = useState<{ url: string; title: string; elements: unknown[] } | null>(null);
   const [lastAction, setLastAction] = useState<{ type: string; label: string } | null>(null);
 
@@ -139,6 +140,15 @@ export default function ExtensionOverlay() {
     .filter((a) => a.dueDate && new Date(a.dueDate) >= new Date(now.getFullYear(), now.getMonth(), now.getDate()))
     .sort((a, b) => new Date(a.dueDate!).getTime() - new Date(b.dueDate!).getTime());
 
+  const speak = useCallback((text: string) => {
+    if (!ttsEnabled || !("speechSynthesis" in window)) return;
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.rate = 0.95;
+    utterance.pitch = 0.9;
+    window.speechSynthesis.speak(utterance);
+  }, [ttsEnabled]);
+
   const executeAgentAction = useCallback((action: AgentAction) => {
     if (window.parent === window) {
       // Standalone preview — simulate
@@ -168,9 +178,12 @@ export default function ExtensionOverlay() {
       });
       const data: AgentPlan = await res.json();
       setAgentHistory((h) => [...h, { role: "jarvis", text: data.response, action: data.action, blocked: data.blocked }]);
+      speak(data.response);
       if (data.action && !data.blocked) executeAgentAction(data.action);
     } catch {
-      setAgentHistory((h) => [...h, { role: "jarvis", text: "Connection error — JARVIS offline." }]);
+      const errMsg = "Connection error — JARVIS offline.";
+      setAgentHistory((h) => [...h, { role: "jarvis", text: errMsg }]);
+      speak(errMsg);
     } finally {
       setAgentLoading(false);
     }
@@ -379,13 +392,23 @@ export default function ExtensionOverlay() {
           {/* AGENT TAB */}
           {tab === "agent" && (
             <div className="flex flex-col h-[460px]">
-              {/* Page context pill */}
-              {pageContext && (
-                <div className="px-3 py-1.5 border-b border-cyan-400/10 flex items-center gap-1.5">
-                  <Eye className="w-3 h-3 text-cyan-400/40" />
-                  <span className="text-[9px] text-cyan-400/50 truncate font-mono">{pageContext.title || pageContext.url}</span>
-                </div>
-              )}
+              {/* Context bar */}
+              <div className="px-3 py-1.5 border-b border-cyan-400/10 flex items-center gap-1.5">
+                {pageContext && (
+                  <>
+                    <Eye className="w-3 h-3 text-cyan-400/40 shrink-0" />
+                    <span className="text-[9px] text-cyan-400/50 truncate font-mono flex-1">{pageContext.title || pageContext.url}</span>
+                  </>
+                )}
+                {!pageContext && <span className="flex-1" />}
+                <button
+                  onClick={() => { setTtsEnabled((v) => !v); if (ttsEnabled) window.speechSynthesis?.cancel(); }}
+                  title={ttsEnabled ? "Mute JARVIS voice" : "Unmute JARVIS voice"}
+                  className={`w-6 h-6 rounded flex items-center justify-center border transition shrink-0 ${ttsEnabled ? "border-cyan-400/40 bg-cyan-500/10 text-cyan-400" : "border-cyan-400/15 text-cyan-400/30 hover:text-cyan-400/50"}`}
+                >
+                  {ttsEnabled ? <Volume2 className="w-3 h-3" /> : <VolumeX className="w-3 h-3" />}
+                </button>
+              </div>
 
               {/* History */}
               <div className="flex-1 overflow-y-auto p-3 space-y-2.5">
