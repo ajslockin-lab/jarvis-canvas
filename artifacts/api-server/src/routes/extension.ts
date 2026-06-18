@@ -75,7 +75,7 @@ function extractFillValue(command: string) {
   return command.match(/\b(?:with|for|to)\s+(.+)$/i)?.[1]?.trim() ?? "";
 }
 
-function planAction(command: string, context: PageContext): AgentPlan {
+export function planAction(command: string, context: PageContext): AgentPlan {
   const nc = normalize(command);
   if (isRisky(command)) return { blocked: true, response: "I can help you navigate there, but I will not submit, delete, or start graded work without a confirmation flow." };
   if (nc.includes("scroll down")) return { response: "Scrolling down.", action: { type: "scroll", direction: "down" } };
