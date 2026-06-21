@@ -89,9 +89,9 @@ export default function SignInPage() {
 
       if (res.ok) {
         const data = await res.json();
-        try {
-          localStorage.setItem("jarvis_session_token", data.sessionToken);
-        } catch { /* ignore */ }
+        // The session cookie set by the server is the source of truth. We
+        // deliberately do NOT mirror data.sessionToken to localStorage here
+        // — see ExtensionOverlay.tsx for the one exception.
         navigate("/dashboard", { replace: true });
         return;
       }

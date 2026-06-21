@@ -6,6 +6,7 @@ import userRouter from "./user";
 import voiceRouter from "./voice";
 import extensionRouter from "./extension";
 import remindersRouter from "./reminders";
+import errorsRouter from "./errors";
 
 const router: IRouter = Router();
 
@@ -16,5 +17,6 @@ router.use(userRouter);
 router.use(voiceRouter);
 router.use(extensionRouter);
 router.use(remindersRouter);
+router.use(errorsRouter);
 
 export default router;

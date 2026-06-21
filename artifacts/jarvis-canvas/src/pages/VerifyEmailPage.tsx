@@ -1,10 +1,10 @@
 // VerifyEmailPage — second step of the signup flow.
 //
-// Reads `userId` (and optionally `email` + `devCode`) from URL params.
+// Reads `userId` (and optionally `email`) from URL params.
 // 6-digit code input with auto-advance + paste support. On success, the
-// server returns a sessionToken + user. We persist the token to
-// localStorage (for extension flows) and the cookie handles the dashboard
-// redirect.
+// server returns a user. The session cookie is the source of truth for
+// auth — the extension iframe has its own localStorage flow because it
+// can't share cookies with the parent page.
 //
 // Resend flow: 60s cooldown enforced server-side; we mirror it client-side
 // to avoid round-trips.
@@ -29,7 +29,6 @@ export default function VerifyEmailPage() {
   const [, navigate] = useLocation();
   const [userId, setUserId] = useState<string>("");
   const [emailHint, setEmailHint] = useState<string>("");
-  const [devCode, setDevCode] = useState<string | null>(null);
   const [code, setCode] = useState<string[]>(() => Array(CODE_LENGTH).fill(""));
   const [stage, setStage] = useState<"idle" | "verifying" | "resending" | "done">("idle");
   const [error, setError] = useState<VerifyError | null>(null);
@@ -46,8 +45,6 @@ export default function VerifyEmailPage() {
     }
     setUserId(u);
     setEmailHint(params.get("email") ?? "");
-    const dc = params.get("devCode");
-    if (dc) setDevCode(dc);
   }, [navigate]);
 
   // Cooldown ticker.
@@ -73,9 +70,10 @@ export default function VerifyEmailPage() {
 
       if (res.ok) {
         const data = await res.json();
-        try {
-          localStorage.setItem("jarvis_session_token", data.sessionToken);
-        } catch { /* ignore */ }
+        // The session cookie is the source of truth for auth — we don't
+        // mirror the token to localStorage here. The extension iframe has
+        // its own localStorage flow (see ExtensionOverlay.tsx) because it
+        // can't share cookies with the parent page.
         setStage("done");
         // Brief success state, then route. If the user already connected
         // Canvas via another flow (rare but possible), go to /dashboard.
@@ -158,7 +156,8 @@ export default function VerifyEmailPage() {
       });
       const data = await res.json();
       if (res.ok) {
-        if (data.devCode) setDevCode(data.devCode);
+        // Resend is real in dev too — the server logs the code to stdout
+        // when RESEND_API_KEY is unset. We don't surface it in the UI.
         setResendCooldown(RESEND_COOLDOWN_S);
         // Clear the existing code so the user knows the old one is dead.
         setCode(Array(CODE_LENGTH).fill(""));
@@ -215,17 +214,6 @@ export default function VerifyEmailPage() {
               <span className="text-[rgba(245,245,245,0.7)]">{emailHint || "your inbox"}</span>.
             </p>
           </div>
-
-          {devCode && (
-            <div className="mb-5 p-3 border border-[#00B4FF]/30 bg-[#00B4FF]/10 rounded-lg">
-              <p className="font-orbitron text-[10px] font-bold tracking-[0.15em] text-[#00B4FF] mb-1">DEV MODE</p>
-              <p className="font-rajdhani text-[11px] text-[rgba(0,180,255,0.8)]">
-                Your code is{" "}
-                <span className="font-mono text-[#00B4FF] font-bold tracking-[0.3em]">{devCode}</span>.
-                In production this is emailed.
-              </p>
-            </div>
-          )}
 
           <div className="mb-4">
             <label className="font-orbitron text-[10px] font-bold tracking-[0.15em] text-[rgba(245,245,245,0.4)] mb-3 block text-center">VERIFICATION CODE</label>

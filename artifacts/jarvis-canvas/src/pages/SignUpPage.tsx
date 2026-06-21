@@ -67,12 +67,12 @@ export default function SignUpPage() {
 
       if (res.ok) {
         const data = await res.json();
-        // Forward the dev code (if present) via the URL so the verify page
-        // can show it. In production, devCode is null and we don't include it.
+        // Forward userId (and email) to the verify page. We deliberately
+        // ignore any devCode that the server might surface — that's only
+        // useful in dev and the verify page no longer shows it.
         const params = new URLSearchParams();
         params.set("userId", data.userId);
         params.set("email", email.trim());
-        if (data.devCode) params.set("devCode", data.devCode);
         navigate(`/verify-email?${params.toString()}`);
         return;
       }
