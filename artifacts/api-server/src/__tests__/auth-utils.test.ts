@@ -6,6 +6,28 @@ beforeAll(() => {
     "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2";
 });
 
+/** Minimal mock user matching the User schema from @workspace/db */
+const mockUserBase = {
+  email: "a@b.com",
+  name: null as string | null,
+  // Password-based auth columns — defaults match the schema. Tests that
+  // exercise password flows override these on a per-case basis.
+  passwordHash: null as string | null,
+  emailVerifiedAt: null as Date | null,
+  authProvider: "canvas" as const,
+  canvasBaseUrl: null as string | null,
+  canvasAccessTokenEncrypted: null as string | null,
+  canvasRefreshTokenEncrypted: null as string | null,
+  canvasTokenExpiresAt: null as Date | null,
+  canvasUserId: null as string | null,
+  referredFrom: null as string | null,
+  lastSyncPhase: null as string | null,
+  lastSyncAt: null as Date | null,
+  lastSyncError: null as string | null,
+  createdAt: new Date(),
+  updatedAt: new Date(),
+};
+
 describe("lib/auth requireAuth", () => {
   it("rejects missing session", async () => {
     const mockRes = {
@@ -23,16 +45,7 @@ describe("lib/auth requireAuth", () => {
 describe("lib/auth getCanvasToken", () => {
   it("returns null when no token", async () => {
     const { getCanvasToken } = await import("../lib/auth.js");
-    const result = await getCanvasToken({
-      id: "u1",
-      email: "a@b.com",
-      name: null,
-      canvasBaseUrl: null,
-      canvasAccessTokenEncrypted: null,
-      canvasRefreshTokenEncrypted: null,
-      canvasTokenExpiresAt: null,
-      canvasUserId: null,
-    });
+    const result = await getCanvasToken({ id: "u1", ...mockUserBase });
     expect(result).toBeNull();
   });
 });
@@ -68,13 +81,8 @@ describe("lib/auth getCanvasToken with valid encrypted token", () => {
     const encrypted = encrypt("my-access-token");
     const result = await getCanvasToken({
       id: "u1",
-      email: "a@b.com",
-      name: null,
-      canvasBaseUrl: null,
+      ...mockUserBase,
       canvasAccessTokenEncrypted: encrypted,
-      canvasRefreshTokenEncrypted: null,
-      canvasTokenExpiresAt: null,
-      canvasUserId: null,
     });
     expect(result).toBe("my-access-token");
   });
@@ -85,13 +93,8 @@ describe("lib/auth getCanvasToken with bad encrypted token", () => {
     const { getCanvasToken } = await import("../lib/auth.js");
     const result = await getCanvasToken({
       id: "u1",
-      email: "a@b.com",
-      name: null,
-      canvasBaseUrl: null,
+      ...mockUserBase,
       canvasAccessTokenEncrypted: "corrupted:data",
-      canvasRefreshTokenEncrypted: null,
-      canvasTokenExpiresAt: null,
-      canvasUserId: null,
     });
     expect(result).toBeNull();
   });

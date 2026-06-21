@@ -1,15 +1,17 @@
 import { useState, useEffect } from "react";
-import { Volume2, VolumeX, Bell, BellOff, Moon, User, AlertCircle, RefreshCw, ArrowLeft } from "lucide-react";
+import { Volume2, VolumeX, Bell, BellOff, Moon, User, AlertCircle, RefreshCw, ArrowLeft, LogOut } from "lucide-react";
 import CanvasConnectButton from "@/components/auth/CanvasConnectButton";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 
 export default function SettingsPage() {
+  const [, navigate] = useLocation();
   const [ttsEnabled, setTtsEnabled] = useState(true);
   const [proactiveAlerts, setProactiveAlerts] = useState(true);
   const [energyLevel, setEnergyLevel] = useState(3);
   const [syncing, setSyncing] = useState(false);
   const [syncResult, setSyncResult] = useState<string | null>(null);
   const [canvasConnected, setCanvasConnected] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
 
   useEffect(() => {
     fetch("/api/user/data", { credentials: "include" })
@@ -34,6 +36,26 @@ export default function SettingsPage() {
     } finally {
       setSyncing(false);
     }
+  };
+
+  // Same flow as the dashboard header button. We keep two surfaces because
+  // the dashboard header is the fast path (one tap from anywhere) and the
+  // settings page is the "I'm here to manage my account" path with bigger
+  // affordance + confirmation.
+  const handleSignOut = async () => {
+    if (signingOut) return;
+    setSigningOut(true);
+    try {
+      await fetch("/api/auth/signout", { method: "POST", credentials: "include" });
+    } catch {
+      // Best-effort — we still navigate even if the request fails.
+    }
+    try {
+      window.localStorage.removeItem("jarvis_session_token");
+    } catch {
+      // ignore
+    }
+    navigate("/signin", { replace: true });
   };
 
   return (
@@ -131,6 +153,29 @@ export default function SettingsPage() {
             </div>
           </div>
         </div>
+
+        {/*
+          Sign out section. Big red button — this is a real action that
+          drops the user's session, so it deserves its own block, not a
+          tiny icon in a corner. Lives at the bottom of settings so the
+          user has to scroll past the things they came here to actually
+          change before accidentally clicking it.
+        */}
+        <SettingsSection title="SESSION" icon={<LogOut className="w-4 h-4" />}>
+          <div className="flex flex-col gap-3">
+            <p className="font-rajdhani text-[13px] text-[#5a7a8a]">
+              Sign out of CARVIS on this device. Your account and data stay — you can sign back in any time.
+            </p>
+            <button
+              onClick={handleSignOut}
+              disabled={signingOut}
+              className="hud-btn px-4 py-2.5 flex items-center gap-2 disabled:opacity-50 w-fit border-[#FF4444]/30 hover:border-[#FF4444] hover:bg-[#FF4444]/10"
+            >
+              <LogOut className="w-4 h-4" />
+              <span>{signingOut ? "SIGNING OUT…" : "SIGN OUT"}</span>
+            </button>
+          </div>
+        </SettingsSection>
       </div>
     </div>
   );

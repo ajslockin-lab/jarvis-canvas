@@ -5,6 +5,7 @@ import canvasRouter from "./canvas";
 import userRouter from "./user";
 import voiceRouter from "./voice";
 import extensionRouter from "./extension";
+import remindersRouter from "./reminders";
 
 const router: IRouter = Router();
 
@@ -14,5 +15,6 @@ router.use(canvasRouter);
 router.use(userRouter);
 router.use(voiceRouter);
 router.use(extensionRouter);
+router.use(remindersRouter);
 
 export default router;

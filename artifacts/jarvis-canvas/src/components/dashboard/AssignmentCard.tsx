@@ -39,22 +39,22 @@ export default function AssignmentCard({
   const handleToggle = async () => {
     if (!id || toggling) return;
     setToggling(true);
-    const newCompleted = !isCompleted;
-    setIsCompleted(newCompleted);
+    const prevCompleted = isCompleted;
+    setIsCompleted(!prevCompleted);
     try {
-      const res = await fetch("/api/canvas/assignments/toggle", {
+      const res = await fetch(`/api/canvas/assignments/${encodeURIComponent(id)}/complete`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ assignmentId: id, completed: newCompleted }),
       });
       if (!res.ok) {
-        setIsCompleted(!newCompleted);
+        setIsCompleted(prevCompleted);
       } else {
-        onToggle?.(id, newCompleted);
+        const data = await res.json();
+        setIsCompleted(data.completed);
+        onToggle?.(id, data.completed);
       }
     } catch {
-      setIsCompleted(!newCompleted);
+      setIsCompleted(prevCompleted);
     } finally {
       setToggling(false);
     }

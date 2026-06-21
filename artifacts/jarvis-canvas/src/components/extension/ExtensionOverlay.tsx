@@ -2,9 +2,9 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { Mic, X, Sparkles, Loader2, ChevronLeft, ChevronRight, Zap, MousePointer, ArrowDown, ArrowUp, Navigation, Eye, Cpu, Volume2, VolumeX } from "lucide-react";
 
 const SESSION_KEY = "jarvis_session_token";
-const API_BASE = typeof window !== "undefined" && window.location.hostname !== "localhost"
-  ? ""
-  : "";
+// API_BASE is empty = relative URLs (same-origin). If API runs on a different domain,
+// set this to the API origin (e.g. "https://api.carvis.app") via env or config.
+const API_BASE = "";
 
 interface Assignment {
   id: string;

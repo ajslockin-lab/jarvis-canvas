@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { coursesTable, assignmentsTable, conversationsTable } from "@workspace/db/schema";
+import { coursesTable, assignmentsTable, conversationsTable, remindersTable } from "@workspace/db/schema";
 import { eq, and } from "drizzle-orm";
 import { requireAuth } from "../lib/auth.js";
 import { classifyIntent, generateResponse } from "../lib/nlu.js";
@@ -50,8 +50,14 @@ router.post("/voice/command", async (req, res) => {
       .flat()
       .filter((a) => !a.dueDate || a.dueDate >= now);
 
+    // Load active reminders for context
+    const reminders = await db
+      .select()
+      .from(remindersTable)
+      .where(and(eq(remindersTable.userId, user.id), eq(remindersTable.active, true)));
+
     const nlu = await classifyIntent(text);
-    const response = await generateResponse(nlu.intent, nlu.entities, { assignments });
+    const response = await generateResponse(nlu.intent, nlu.entities, { assignments, reminders });
 
     try {
       await db.insert(conversationsTable).values({ userId: user.id, role: "user", message: text, intent: nlu.intent });

@@ -47,15 +47,19 @@ function generateAlerts(courses: { name: string; assignments: { name: string; du
   }
 
   const overdue = courses.flatMap((c) =>
-    c.assignments.filter((a) => a.dueDate && new Date(a.dueDate) < now).map((a) => ({ ...a, courseName: c.name }))
+    c.assignments.filter((a) => a.dueDate && new Date(a.dueDate) < now && !("completed" in a && a.completed)).map((a) => ({ ...a, courseName: c.name }))
   );
 
   if (overdue.length > 0) {
+    const shownOverdue = overdue.slice(0, 3);
+    const remaining = overdue.length - shownOverdue.length;
     alerts.push({
       id: "overdue",
       type: "warning",
-      title: `${overdue.length} OVERDUE ASSIGNMENT${overdue.length > 1 ? "S" : ""}`,
-      message: `You have ${overdue.length} past-due item${overdue.length > 1 ? "s" : ""}. Check if submissions are still accepted.`,
+      title: remaining > 0 ? `${overdue.length} OVERDUE ASSIGNMENTS` : `${overdue.length} OVERDUE ASSIGNMENT${overdue.length > 1 ? "S" : ""}`,
+      message: remaining > 0
+        ? `${shownOverdue.map((a) => a.name).join(", ")} and ${remaining} more past-due. Check if submissions are still accepted.`
+        : `${shownOverdue.map((a) => a.name).join(", ")} — check if submissions are still accepted.`,
       dismissable: true,
       urgent: true,
     });
@@ -105,7 +109,18 @@ function generateAlerts(courses: { name: string; assignments: { name: string; du
   return alerts;
 }
 
-export default function ProactiveFeed({ maxItems = 3 }: { maxItems?: number }) {
+export default function ProactiveFeed({
+  maxItems = 3,
+  hasLoaded: hasLoadedProp,
+}: {
+  maxItems?: number;
+  /** When provided explicitly, overrides the internal "have we fetched yet"
+   *  state. The dashboard sets this from its sync phase: false until the
+   *  first sync reaches "done", true afterwards. This prevents the
+   *  "ALL CLEAR — NO INTEL" message from rendering during first-run when
+   *  no data has actually been loaded yet (NN/g empty-state guidance). */
+  hasLoaded?: boolean;
+}) {
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
   const [alerts, setAlerts] = useState<ProactiveAlert[]>([]);
   const [loading, setLoading] = useState(true);
@@ -123,7 +138,14 @@ export default function ProactiveFeed({ maxItems = 3 }: { maxItems?: number }) {
 
   const visibleAlerts = alerts.filter((a) => !dismissed.has(a.id)).slice(0, maxItems);
 
-  if (loading) {
+  // If the parent told us we haven't loaded yet, OR our own internal fetch
+  // is still in flight, show skeletons. The parent override matters because
+  // the dashboard knows about sync phases (which we don't) and can preempt
+  // the "ALL CLEAR" message that would otherwise render after our internal
+  // /api/user/data fetch returns with an empty courses array.
+  const isLoading = hasLoadedProp === false || (hasLoadedProp === undefined && loading);
+
+  if (isLoading) {
     return (
       <div className="space-y-3">
         {[1, 2].map((i) => <div key={i} className="h-16 rounded bg-[#0A1520]/50 animate-pulse" />)}
