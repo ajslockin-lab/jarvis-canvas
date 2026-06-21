@@ -1,14 +1,17 @@
 {
   "manifest_version": 3,
   "name": "CARVIS Canvas Assistant",
-  "version": "0.2.0",
-  "description": "CARVIS on Canvas — AI assistant for deadlines, grades, voice commands, and page control right inside Canvas LMS",
+  "version": "1.0.0",
+  "short_name": "CARVIS",
+  "author": "Carvis",
+  "description": "AI assistant for Canvas LMS — deadlines, grades, voice commands, and page control right inside your school's Canvas.",
+  "homepage_url": "https://carvis.app",
   "permissions": [
     "storage",
     "activeTab"
   ],
   "host_permissions": [
-    "https://carvis.app/*"
+    "https://carvis.app/extension/iframe*"
   ],
   "action": {
     "default_icon": {
@@ -22,6 +25,9 @@
     "16": "icons/icon16.png",
     "48": "icons/icon48.png",
     "128": "icons/icon128.png"
+  },
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'"
   },
   "content_scripts": [
     {

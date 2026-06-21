@@ -1,5 +1,29 @@
 # Chrome Web Store Submission Guide
 
+## Permission justifications (Chrome Web Store requires these)
+
+When filling in the "Permission justifications" form in the developer dashboard:
+
+- **`storage`** — Used to read/write the user-configurable `appUrl` override
+  (via `chrome.storage.sync`) and to persist the session token returned
+  from sign-in (via `chrome.storage.local`). The session token lets the
+  overlay iframe authenticate against the carvis.app API without
+  cross-origin cookie issues.
+- **`activeTab`** — Required to inject the floating "CARVIS" bubble button
+  on the current Canvas tab. The extension does NOT access page content
+  outside of Canvas; the content script registers only on
+  `*.instructure.com` URLs.
+- **`host_permissions: https://carvis.app/extension/iframe*`** — The
+  only carvis.app URL the extension needs to load is the authed overlay
+  iframe. Narrowing to a single path (rather than `https://carvis.app/*`)
+  limits the host scope the extension can interact with.
+
+The extension does NOT use:
+- `tabs` (no per-tab state)
+- `webRequest` / `declarativeNetRequest` (no traffic interception)
+- `cookies` (no cookie access)
+- `scripting` (no dynamic script injection)
+
 ## What you need to submit
 
 ### 1. Zip the extension

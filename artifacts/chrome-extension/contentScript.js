@@ -16,7 +16,24 @@
   function getAppUrl(cb) {
     if (typeof chrome !== "undefined" && chrome.storage?.sync) {
       chrome.storage.sync.get(["appUrl"], (result) => {
-        cb((result.appUrl || DEFAULT_APP_URL).replace(/\/$/, ""));
+        const raw = (result.appUrl || DEFAULT_APP_URL).replace(/\/$/, "");
+        // Defense-in-depth: chrome.storage.sync is user-writable via the
+        // extension popup, so a user (or a script that gets chrome.storage
+        // access) could set a hostile appUrl. Refuse anything that isn't
+        // https:// so we never mount an iframe over plaintext or to a
+        // javascript: / data: / file:// origin.
+        try {
+          const u = new URL(raw);
+          if (u.protocol !== "https:") {
+            console.warn("[CARVIS] Refusing non-https appUrl:", raw);
+            cb(DEFAULT_APP_URL);
+            return;
+          }
+        } catch {
+          cb(DEFAULT_APP_URL);
+          return;
+        }
+        cb(raw);
       });
       return;
     }
@@ -218,6 +235,5 @@
 
   getAppUrl((url) => {
     appOrigin = url;
-    console.log("[CARVIS] Extension ready — app URL:", appOrigin);
   });
 })();
