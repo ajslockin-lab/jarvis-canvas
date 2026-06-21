@@ -18,8 +18,15 @@ const EXTENSION_FILES = [
   "icons/icon512.png",
 ];
 
-// Serve the Chrome extension as a downloadable ZIP
-router.get("/extension/download", (_req, res) => {
+// Serve the Chrome extension as a downloadable ZIP.
+//
+// Requires auth — even though the ZIP contains no secrets, requiring auth
+// keeps anonymous recon off the endpoint. The auth check is intentionally
+// loose (any signed-in user) so it doesn't couple to Canvas state.
+router.get("/extension/download", async (req, res) => {
+  const user = await requireAuth(req, res);
+  if (!user) return;
+
   try {
     const extDir = join(process.cwd(), "artifacts", "chrome-extension");
 
@@ -110,9 +117,23 @@ router.get("/extension/download", (_req, res) => {
     eocd.writeUInt16LE(0, 20);
     parts.push(...centralEntries, eocd);
 
+    const zip = Buffer.concat(parts);
+
+    // Weak ETag from the concatenated file sizes + count. Same inputs →
+    // same ETag, so the client (and a CDN) can 304 it. Weak because we
+    // don't hash content — collision risk is acceptable for a stable
+    // extension release.
+    const etag = `W/"ext-${files.length}-${zip.length}"`;
+    if (req.headers["if-none-match"] === etag) {
+      res.status(304).end();
+      return;
+    }
+
     res.setHeader("Content-Type", "application/zip");
     res.setHeader("Content-Disposition", 'attachment; filename="carvis-extension.zip"');
-    res.send(Buffer.concat(parts));
+    res.setHeader("Cache-Control", "public, max-age=300");
+    res.setHeader("ETag", etag);
+    res.send(zip);
   } catch (err) {
     console.error("Extension download error:", err);
     res.status(500).json({ error: "Failed to generate extension download" });
