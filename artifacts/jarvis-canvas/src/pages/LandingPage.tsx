@@ -3,6 +3,7 @@ import { Sparkles, ArrowRight, Zap, Calendar, BookOpen, Mic, Check, Smartphone, 
 import { Link, useLocation } from "wouter";
 import { usePWAInstall } from "@/hooks/use-pwa-install";
 import { useIsMobile } from "@/hooks/use-mobile";
+import CinematicDemo from "@/components/CinematicDemo";
 
 export default function LandingPage() {
   const [scrolled, setScrolled] = useState(false);

@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { randomBytes } from "crypto";
+import { randomBytes, randomInt } from "crypto";
 import { sql } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import { db } from "@workspace/db";
@@ -127,15 +127,12 @@ const resendSchema = z.object({
   userId: z.string().min(1, "userId is required"),
 });
 
-const checkEmailSchema = z.object({
-  email: z.string().min(1).email("Enter a valid email address"),
-});
-
 // 6-digit codes using crypto.randomInt for unbiased uniform distribution.
 // 1_000_000 codes = ~7.2M years to brute-force at 5 tries per 15 minutes.
+// randomInt (Node 14.17+) avoids the modulo bias that randomBytes % N has
+// when N is not a power of 2.
 function generateVerificationCode(): string {
-  const n = randomBytes(4).readUInt32BE(0) % 1_000_000;
-  return n.toString().padStart(6, "0");
+  return randomInt(0, 1_000_000).toString().padStart(6, "0");
 }
 
 function newId(prefix: string): string {
@@ -432,26 +429,6 @@ router.post("/auth/resend-code", async (req, res) => {
   }
 });
 
-router.post("/auth/check-email", async (req, res) => {
-  try {
-    const parsed = checkEmailSchema.safeParse(req.body);
-    if (!parsed.success) {
-      sendError(res, 400, ErrorCodes.badRequest, "Enter a valid email");
-      return;
-    }
-    const { email } = parsed.data;
-    const [existing] = await db
-      .select({ id: usersTable.id })
-      .from(usersTable)
-      .where(sql`LOWER(${usersTable.email}) = ${email.toLowerCase()}`)
-      .limit(1);
-    res.json({ exists: Boolean(existing) });
-  } catch (err) {
-    console.error("Check-email error:", err);
-    sendError(res, 500, ErrorCodes.serverError, "Something went wrong on our end");
-  }
-});
-
 // ---------- Canvas OAuth ----------
 
 router.post("/auth/canvas/start", async (req, res) => {
@@ -470,7 +447,15 @@ router.post("/auth/canvas/start", async (req, res) => {
     }
 
     const state = randomBytes(16).toString("hex");
-    const redirectUri = `${process.env["APP_URL"] || ""}/api/auth/canvas`;
+    const appUrl = process.env["APP_URL"];
+    if (!appUrl || !/^https:\/\/[^\s]+$/.test(appUrl)) {
+      // APP_URL is set at deploy time. If it's missing or not https, we have
+      // an open-redirect risk (the URL is used in `redirect` calls and as a
+      // cookie/path prefix). Fail-closed.
+      sendError(res, 500, ErrorCodes.serverError, "Server misconfigured — APP_URL must be set to an https:// origin");
+      return;
+    }
+    const redirectUri = `${appUrl}/api/auth/canvas`;
     const params = new URLSearchParams({
       client_id: clientId,
       response_type: "code",
@@ -493,7 +478,12 @@ router.get("/auth/canvas", async (req, res) => {
     const cookies = (req as unknown as Request & { cookies?: Record<string, string> }).cookies ?? {};
     const storedState = cookies["canvas_oauth_state"];
     const canvasUrl = cookies["canvas_oauth_url"];
-    const appUrl = process.env["APP_URL"] || "";
+    const appUrl = process.env["APP_URL"];
+
+    if (!appUrl || !/^https:\/\/[^\s]+$/.test(appUrl)) {
+      res.status(500).send("Server misconfigured — APP_URL must be set to an https:// origin");
+      return;
+    }
 
     if (oauthError) {
       res.redirect(`${appUrl}/signin?error=${encodeURIComponent("Canvas authorization was denied")}`);
@@ -569,12 +559,13 @@ router.get("/auth/canvas", async (req, res) => {
     res.redirect(`${appUrl}/onboarding/canvas?connected=1`);
   } catch (err) {
     console.error("Canvas OAuth callback error:", err);
-    const appUrl = process.env["APP_URL"] || "";
+    const appUrl = process.env["APP_URL"];
+    const redirectBase = appUrl && /^https:\/\/[^\s]+$/.test(appUrl) ? appUrl : "";
     const msg = err instanceof Error ? err.message : "";
     if (msg.includes("connect") || msg.includes("ECONNREFUSED") || msg.includes("database") || (err instanceof Error && err.name === "DrizzleQueryError")) {
-      res.redirect(`${appUrl}/signin?error=${encodeURIComponent("Service temporarily unavailable — try again in a moment")}`);
+      res.redirect(`${redirectBase}/signin?error=${encodeURIComponent("Service temporarily unavailable — try again in a moment")}`);
     } else {
-      res.redirect(`${appUrl}/signin?error=${encodeURIComponent("OAuth callback failed — try PAT sign-in instead")}`);
+      res.redirect(`${redirectBase}/signin?error=${encodeURIComponent("OAuth callback failed — try PAT sign-in instead")}`);
     }
   }
 });

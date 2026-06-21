@@ -150,9 +150,8 @@ export default function OnboardingCanvasPage() {
         setStage("loading_courses");
         await new Promise((r) => setTimeout(r, 250));
         setStage("almost_done");
-        try {
-          localStorage.setItem("jarvis_session_token", data.sessionToken);
-        } catch { /* ignore */ }
+        // Session cookie is the source of truth — no localStorage mirror
+        // on the web app. The extension iframe has its own flow.
         try { localStorage.removeItem("carvis_signin_draft"); } catch { /* ignore */ }
         // Hand off to the dashboard. Its useEffect auto-fires the first
         // sync (we already wired this in the first-90-seconds plan).

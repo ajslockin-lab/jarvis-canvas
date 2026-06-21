@@ -1,6 +1,7 @@
 import app from "./app";
 import { logger } from "./lib/logger";
 import { pool } from "@workspace/db";
+import { startSyncScheduler, stopSyncScheduler } from "./lib/sync-scheduler.js";
 
 const rawPort = process.env["PORT"];
 
@@ -14,6 +15,20 @@ const port = Number(rawPort);
 
 if (Number.isNaN(port) || port <= 0) {
   throw new Error(`Invalid PORT value: "${rawPort}"`);
+}
+
+// Fail-closed: in production, refuse to boot without a real email transport.
+// Without this, a deploy that forgets to set RESEND_API_KEY would silently
+// fall back to the dev service, which logs OTP codes to stdout and returns
+// them in API responses — fine in dev, catastrophic in prod.
+if (
+  process.env["NODE_ENV"] === "production" &&
+  !process.env["RESEND_API_KEY"]
+) {
+  throw new Error(
+    "RESEND_API_KEY is required when NODE_ENV=production. " +
+    "Set it to your Resend API key, or unset NODE_ENV for dev mode.",
+  );
 }
 
 // Process-level error handlers — prevent silent crashes
@@ -33,6 +48,9 @@ const server = app.listen(port, (err) => {
   }
 
   logger.info({ port }, "Server listening");
+
+  // Start background Canvas sync scheduler (disabled unless CANVAS_SYNC_ENABLED=true)
+  startSyncScheduler();
 });
 
 // Graceful shutdown — drain connections before exiting
@@ -42,6 +60,8 @@ async function shutdown(signal: string) {
   if (shuttingDown) return;
   shuttingDown = true;
   logger.info({ signal }, "Shutting down...");
+
+  stopSyncScheduler();
 
   // Stop accepting new connections
   server.close(() => {

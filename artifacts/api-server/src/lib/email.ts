@@ -109,15 +109,20 @@ export async function sendVerificationCode(to: string, code: string): Promise<vo
 
 /**
  * Dev-only: returns the verification code so the signup route can surface it
- * in the response body. In production, returns null and the route omits it
- * from the JSON it returns.
+ * in the response body. When Resend is configured (the only real transport),
+ * returns null and the route omits the field from the JSON it returns.
+ *
+ * The gate is on RESEND_API_KEY (not NODE_ENV) so a staging deploy that
+ * happens to be NODE_ENV=production but hasn't set Resend yet still gets
+ * the dev code in the response — and a production deploy with the key set
+ * never leaks a code regardless of NODE_ENV value.
  *
  * This is the cheapest way to make the signup → verify flow testable without
- * standing up SMTP. The field is omitted from the response in prod so a real
- * attacker can't read codes out of signup responses even if they have a valid
- * email under their control.
+ * standing up SMTP. The field is omitted from the response when Resend is
+ * configured, so a real attacker can't read codes out of signup responses
+ * even if they have a valid email under their control.
  */
 export function devVerificationCodeIfEnabled(code: string): string | null {
-  if (process.env["NODE_ENV"] === "production") return null;
+  if (process.env["RESEND_API_KEY"]) return null;
   return code;
 }
