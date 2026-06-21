@@ -9,7 +9,7 @@ beforeAll(() => {
 describe("OAuth callback SSRF guard", () => {
   it("rejects tampered canvas_oauth_url cookie", async () => {
     const maliciousUrl = "https://evil.com";
-    expect(VALIDATE_CANVAS_URL.test(maliciousUrl)).toBe(false);
+    expect(VALIDATE_CANVAS_URL(maliciousUrl)).toBe(false);
   });
 
   it("allows valid instructure.com URLs", async () => {
@@ -19,7 +19,19 @@ describe("OAuth callback SSRF guard", () => {
       "https://canvas-school123.instructure.com",
     ];
     for (const url of validUrls) {
-      expect(VALIDATE_CANVAS_URL.test(url)).toBe(true);
+      expect(VALIDATE_CANVAS_URL(url)).toBe(true);
+    }
+  });
+
+  it("allows self-hosted Canvas URLs (canvas.school.edu)", async () => {
+    const selfHostedUrls = [
+      "https://canvas.gatech.edu",
+      "https://canvas.mit.edu",
+      "https://canvas.ubc.ca",
+      "https://canvas.illinois.edu",
+    ];
+    for (const url of selfHostedUrls) {
+      expect(VALIDATE_CANVAS_URL(url)).toBe(true);
     }
   });
 
@@ -32,7 +44,7 @@ describe("OAuth callback SSRF guard", () => {
       "https://school.instructure.com@evil.com",
     ];
     for (const url of maliciousUrls) {
-      expect(VALIDATE_CANVAS_URL.test(url)).toBe(false);
+      expect(VALIDATE_CANVAS_URL(url)).toBe(false);
     }
   });
 

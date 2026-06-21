@@ -47,8 +47,15 @@ Thumbs.db
 # Replit
 .cache/
 .local/
+.replit
+replit.md
+.replit-artifact/
 
 # Local environment
 .env
 .pgdata/
 .carvis-ref/
+.migration-backup/
+
+# Vite PWA dev output
+dev-dist/

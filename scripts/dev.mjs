@@ -168,7 +168,7 @@ async function main() {
   const appUrl = process.env.APP_URL ?? `http://localhost:${webPort}`;
 
   console.log(`Starting API server on http://localhost:${apiPort}...`);
-  start("node", ["--enable-source-maps", "artifacts/api-server/dist/index.mjs"], {
+  start("node", ["artifacts/api-server/dist/index.mjs"], {
     name: "api",
     env: {
       NODE_ENV: "development",

@@ -2,20 +2,64 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
-    <title>CARVIS Canvas Assistant</title>
-    <meta name="description" content="CARVIS Canvas Assistant — your AI study companion for Canvas." />
+
+    <!--
+      PWA install + iOS native-feel meta tags.
+      - viewport-fit=cover lets the content extend behind the iPhone notch
+      - theme-color matches the manifest and Android's address bar
+      - apple-mobile-web-app-* are required for iOS to treat the page as
+        an installed app (no Safari chrome, custom status bar, custom title)
+      - apple-touch-icon is the home-screen icon iOS uses; PNG (not SVG)
+        because iOS doesn't render SVG in the springboard
+    -->
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1, viewport-fit=cover"
+    />
+    <meta name="theme-color" content="#FF3C00" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta
+      name="apple-mobile-web-app-status-bar-style"
+      content="black-translucent"
+    />
+    <meta name="apple-mobile-web-app-title" content="Carvis" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="application-name" content="Carvis" />
+
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link
+      rel="apple-touch-icon"
+      href="/apple-touch-icon.png"
+      sizes="180x180"
+    />
+    <!-- Splash screen background color for iOS — must match the manifest
+         background_color to avoid a flash of white before the web app loads. -->
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+
+    <title>Carvis — Canvas Assistant</title>
+    <meta
+      name="description"
+      content="Carvis — your AI study companion for Canvas. Voice, deadlines, grades."
+    />
     <meta name="robots" content="index, follow" />
-    <meta property="og:title" content="CARVIS Canvas Assistant" />
-    <meta property="og:description" content="CARVIS Canvas Assistant — your AI study companion for Canvas." />
+    <meta property="og:title" content="Carvis — Canvas Assistant" />
+    <meta
+      property="og:description"
+      content="Carvis — your AI study companion for Canvas."
+    />
     <meta property="og:type" content="website" />
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="CARVIS Canvas Assistant" />
-    <meta name="twitter:description" content="CARVIS Canvas Assistant — your AI study companion for Canvas." />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700&display=swap" rel="stylesheet">
+    <meta name="twitter:title" content="Carvis — Canvas Assistant" />
+    <meta
+      name="twitter:description"
+      content="Carvis — your AI study companion for Canvas."
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700&display=swap"
+      rel="stylesheet"
+    />
   </head>
   <body>
     <div id="root"></div>

@@ -1,11 +1,24 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Volume2, VolumeX, X } from "lucide-react";
+import { Volume2, VolumeX, X, Mic, Send } from "lucide-react";
 import CarvisOrb from "./CarvisOrb";
 import type { OrbState } from "@/lib/carvisOrb";
 
 interface VoiceInterfaceProps {
   isOpen: boolean;
   onClose: () => void;
+  /** Optional text pre-fill. When provided, the text input is shown
+   *  immediately with this value — used by the FirstRunNudge chips to make
+   *  the magic-moment tap → answer path a single click. */
+  defaultQuery?: string;
+  /** When false (the default), the text input is the primary interaction
+   *  surface and the press-and-hold voice button is hidden. Voice becomes
+   *  opt-in to avoid the 30-50% bounce rate from premature mic permission
+   *  prompts (NN/g voice UX research). */
+  voiceModeEnabled?: boolean;
+  /** Fired the first time the user submits a question in this session —
+   *  used by the dashboard to fire the first_question_asked activation event
+   *  exactly once. */
+  onFirstSubmit?: () => void;
 }
 
 type SpeechRecognitionConstructor = new () => SpeechRecognitionLike;
@@ -67,7 +80,13 @@ function getStatusText(
   return "press and hold to speak";
 }
 
-export default function VoiceInterface({ isOpen, onClose }: VoiceInterfaceProps) {
+export default function VoiceInterface({
+  isOpen,
+  onClose,
+  defaultQuery,
+  voiceModeEnabled = false,
+  onFirstSubmit,
+}: VoiceInterfaceProps) {
   const [isListening, setIsListening] = useState(false);
   const [transcript, setTranscript] = useState("");
   const [response, setResponse] = useState("");
@@ -75,10 +94,22 @@ export default function VoiceInterface({ isOpen, onClose }: VoiceInterfaceProps)
   const [isTtsPlaying, setIsTtsPlaying] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [speechSupported] = useState(() => Boolean(getSpeechRecognition()));
+  // Text-input state — the primary first-time interaction path. Hydrated
+  // from defaultQuery when the modal opens (e.g. from a FirstRunNudge chip).
+  const [textInput, setTextInput] = useState<string>(defaultQuery ?? "");
+  const [hasSubmittedOnce, setHasSubmittedOnce] = useState(false);
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
   const finalTranscriptRef = useRef("");
   const displayTranscriptRef = useRef("");
   const shouldSubmitRef = useRef(false);
+
+  // Hydrate the text input whenever the modal opens with a fresh defaultQuery.
+  // Without this, reopening the modal would show a stale value.
+  useEffect(() => {
+    if (isOpen) {
+      setTextInput(defaultQuery ?? "");
+    }
+  }, [isOpen, defaultQuery]);
 
   const speak = useCallback((text: string) => {
     if (!("speechSynthesis" in window)) return;
@@ -104,6 +135,12 @@ export default function VoiceInterface({ isOpen, onClose }: VoiceInterfaceProps)
 
     setTranscript(cleanText);
     setIsLoading(true);
+    if (!hasSubmittedOnce) {
+      setHasSubmittedOnce(true);
+      // Fire exactly once per session. The dashboard's onFirstSubmit handler
+      // is responsible for not double-firing across remounts.
+      onFirstSubmit?.();
+    }
     try {
       const res = await fetch("/api/voice/command", {
         method: "POST",
@@ -122,7 +159,20 @@ export default function VoiceInterface({ isOpen, onClose }: VoiceInterfaceProps)
     } finally {
       setIsLoading(false);
     }
-  }, [isLoading, speak, ttsEnabled]);
+  }, [hasSubmittedOnce, isLoading, onFirstSubmit, speak, ttsEnabled]);
+
+  // Text-submit handler for the primary first-time UX. Mirrors the press-and-hold
+  // submit path but reads from a controlled input instead of the recognition
+  // transcript.
+  const handleTextSubmit = useCallback((e?: React.FormEvent) => {
+    e?.preventDefault();
+    const value = textInput.trim();
+    if (!value || isLoading) return;
+    // Clear the input on submit so the next prompt is clean. The transcript
+    // panel still shows the question we just asked.
+    setTextInput("");
+    void submitCommand(value);
+  }, [isLoading, submitCommand, textInput]);
 
   useEffect(() => {
     const SpeechRecognitionAPI = getSpeechRecognition();
@@ -192,7 +242,20 @@ export default function VoiceInterface({ isOpen, onClose }: VoiceInterfaceProps)
   if (!isOpen) return null;
 
   const orbState = getOrbState(isListening, isLoading, isTtsPlaying);
-  const statusText = getStatusText(speechSupported, isListening, isLoading, isTtsPlaying, ttsEnabled);
+  // Status text adapts to which input mode is active. When voice is off we
+  // don't say "press and hold" — that hint is wrong for the text-first flow.
+  const statusText = voiceModeEnabled
+    ? getStatusText(speechSupported, isListening, isLoading, isTtsPlaying, ttsEnabled)
+    : isLoading
+      ? "thinking..."
+      : isTtsPlaying
+        ? ""
+        : "type a question — press enter to send";
+  // Press-and-hold overlay only enabled when voice mode is on AND the
+  // browser exposes a SpeechRecognition implementation. Otherwise the text
+  // input is the only path — Firefox and other unsupported browsers
+  // shouldn't see a broken mic button (NN/g voice UX).
+  const voiceButtonEnabled = voiceModeEnabled && speechSupported;
 
   return (
     <div className="carvis-voice fixed inset-0 z-50 overflow-hidden bg-black">
@@ -226,16 +289,23 @@ export default function VoiceInterface({ isOpen, onClose }: VoiceInterfaceProps)
         </button>
       </div>
 
-      <button
-        type="button"
-        className="absolute inset-0 z-10 touch-none"
-        aria-label="Press and hold to speak"
-        onPointerDown={startListening}
-        onPointerUp={stopListening}
-        onPointerCancel={stopListening}
-        onPointerLeave={stopListening}
-        disabled={isLoading || !speechSupported}
-      />
+      {/*
+        Press-and-hold layer is only rendered when voice mode is enabled.
+        Wrapped in a fragment + guard so the overlay does not intercept
+        pointer events on the text input below.
+      */}
+      {voiceButtonEnabled && (
+        <button
+          type="button"
+          className="absolute inset-0 z-10 touch-none"
+          aria-label="Press and hold to speak"
+          onPointerDown={startListening}
+          onPointerUp={stopListening}
+          onPointerCancel={stopListening}
+          onPointerLeave={stopListening}
+          disabled={isLoading}
+        />
+      )}
 
       {(transcript || response) && (
         <div className="pointer-events-none absolute left-1/2 top-16 z-20 w-full max-w-lg -translate-x-1/2 px-6">
@@ -247,6 +317,52 @@ export default function VoiceInterface({ isOpen, onClose }: VoiceInterfaceProps)
           )}
         </div>
       )}
+
+      {/*
+        Primary text input. Always rendered — this is the first-time UX path.
+        z-30 sits above the press-and-hold layer (z-10) so users can click
+        into the field even when voice mode is on, and below the corner
+        controls (z-20) is intentional so the close button stays accessible.
+        Wait — controls are also z-20, so the input needs z-30 to be on top
+        of them in the bottom area; the input is at the bottom-center
+        though, so it doesn't overlap the controls visually. Keep z-30 for
+        safety in case of layout shifts on small screens.
+      */}
+      <form
+        onSubmit={handleTextSubmit}
+        className="absolute bottom-20 left-1/2 z-30 -translate-x-1/2 w-full max-w-xl px-6"
+      >
+        <div className="flex items-center gap-2 bg-black/60 border border-[#FF4444]/40 rounded-full px-4 py-2 backdrop-blur-sm focus-within:border-[#FF4444] transition">
+          {voiceButtonEnabled && (
+            <Mic
+              className={`w-4 h-4 shrink-0 ${
+                isListening ? "text-[#FF4444] hud-sync-active" : "text-[rgba(245,245,245,0.5)]"
+              }`}
+            />
+          )}
+          <input
+            type="text"
+            value={textInput}
+            onChange={(e) => setTextInput(e.target.value)}
+            placeholder={
+              voiceButtonEnabled
+                ? "type or hold to speak…"
+                : "what's due this week?"
+            }
+            disabled={isLoading}
+            autoFocus
+            className="flex-1 bg-transparent border-none outline-none text-[#f5f5f5] font-rajdhani text-sm placeholder:text-[rgba(245,245,245,0.35)]"
+          />
+          <button
+            type="submit"
+            disabled={isLoading || !textInput.trim()}
+            className="text-[#FF4444] hover:text-[#FF6B3D] disabled:opacity-30 disabled:cursor-not-allowed transition shrink-0"
+            aria-label="Send question"
+          >
+            <Send className="w-4 h-4" />
+          </button>
+        </div>
+      </form>
 
       <div className="carvis-status pointer-events-none absolute bottom-10 left-1/2 z-20 -translate-x-1/2">
         {statusText}

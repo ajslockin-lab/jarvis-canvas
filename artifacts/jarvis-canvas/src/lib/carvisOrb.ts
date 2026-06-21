@@ -15,12 +15,28 @@ export interface Orb {
 
 export function createOrb(canvas: HTMLCanvasElement): Orb {
   let destroyed = false;
+  let raf = 0;
   const N = 2000;
+  const reduceMotion =
+    typeof window !== "undefined" &&
+    window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
   renderer.setPixelRatio(window.devicePixelRatio);
   renderer.setSize(canvas.clientWidth, canvas.clientHeight);
   renderer.setClearColor(0x000000, 1);
+
+  // Handle WebGL context loss (e.g. tab backgrounds, GPU contention)
+  canvas.addEventListener("webglcontextlost", (e) => {
+    e.preventDefault();
+    if (raf) cancelAnimationFrame(raf);
+    raf = 0;
+  });
+  canvas.addEventListener("webglcontextrestored", () => {
+    if (!destroyed && !reduceMotion) {
+      raf = requestAnimationFrame(animate);
+    }
+  });
 
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(45, canvas.clientWidth / canvas.clientHeight, 1, 1000);
@@ -136,11 +152,19 @@ export function createOrb(canvas: HTMLCanvasElement): Orb {
   let bass = 0;
   let mid = 0;
 
-  const clock = new THREE.Clock();
+  const idleColor = new THREE.Color(0xff1e1e);
+const thinkingColor = new THREE.Color(0xff4444);
+const speakingColor = new THREE.Color(0xff6b3d);
+const idleLineColor = new THREE.Color(0x8b0000);
+const thinkingLineColor = new THREE.Color(0xa01515);
+
+const clock = new THREE.Clock();
 
   function animate() {
     if (destroyed) return;
-    requestAnimationFrame(animate);
+    if (!reduceMotion) {
+      raf = requestAnimationFrame(animate);
+    }
     const t = clock.getElapsedTime();
 
     switch (state) {
@@ -365,14 +389,14 @@ export function createOrb(canvas: HTMLCanvasElement): Orb {
     mat.size = currentSize + bass * 0.05;
 
     if (state === "thinking") {
-      mat.color.lerp(new THREE.Color(0xff4444), 0.015);
-      lineMat.color.lerp(new THREE.Color(0xa01515), 0.015);
+      mat.color.lerp(thinkingColor, 0.015);
+      lineMat.color.lerp(thinkingLineColor, 0.015);
     } else if (state === "speaking") {
-      mat.color.lerp(new THREE.Color(0xff6b3d), 0.015);
-      lineMat.color.lerp(new THREE.Color(0xa01515), 0.015);
+      mat.color.lerp(speakingColor, 0.015);
+      lineMat.color.lerp(thinkingLineColor, 0.015);
     } else {
-      mat.color.lerp(new THREE.Color(0xff1e1e), 0.015);
-      lineMat.color.lerp(new THREE.Color(0x8b0000), 0.015);
+      mat.color.lerp(idleColor, 0.015);
+      lineMat.color.lerp(idleLineColor, 0.015);
     }
 
     camera.position.x = Math.sin(t * 0.02) * 5;
@@ -405,7 +429,17 @@ export function createOrb(canvas: HTMLCanvasElement): Orb {
     },
     destroy() {
       destroyed = true;
+      if (raf) cancelAnimationFrame(raf);
       resizeObserver.disconnect();
+      scene.remove(points);
+      scene.remove(lines);
+      scene.remove(electrons);
+      geo.dispose();
+      lineGeo.dispose();
+      electronGeo.dispose();
+      mat.dispose();
+      lineMat.dispose();
+      electronMat.dispose();
       renderer.dispose();
     },
   };

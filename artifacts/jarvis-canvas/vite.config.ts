@@ -5,13 +5,7 @@ import path from "path";
 import runtimeErrorOverlay from "@replit/vite-plugin-runtime-error-modal";
 import { VitePWA } from "vite-plugin-pwa";
 
-const rawPort = process.env.PORT;
-
-if (!rawPort) {
-  throw new Error(
-    "PORT environment variable is required but was not provided.",
-  );
-}
+const rawPort = process.env.PORT || "20034";
 
 const port = Number(rawPort);
 
@@ -27,20 +21,50 @@ export default defineConfig({
     runtimeErrorOverlay(),
     VitePWA({
       registerType: "autoUpdate",
-      includeAssets: ["favicon.svg", "robots.txt"],
+      devOptions: {
+        enabled: true,
+      },
+      includeAssets: ["favicon.svg", "robots.txt", "apple-touch-icon.png"],
       manifest: {
-        name: "Jarvis Mobile",
-        short_name: "Jarvis",
-        description: "AI-powered Canvas LMS assistant",
-        theme_color: "#ffffff",
-        background_color: "#ffffff",
+        name: "Carvis — Canvas Assistant",
+        short_name: "Carvis",
+        description: "AI-powered Canvas LMS assistant — voice, deadlines, grades",
+        // Brand red so the Android address bar and install-sheet chrome
+        // pick up the brand, not generic web colors.
+        theme_color: "#FF3C00",
+        // Black matches the dashboard's bg-[#0a0000] and the iOS splash
+        // background, so there's no white flash on launch.
+        background_color: "#0a0000",
         display: "standalone",
+        orientation: "portrait",
         scope: "/",
         start_url: "/",
         icons: [
-          { src: "/pwa-192x192.png", sizes: "192x192", type: "image/png" },
-          { src: "/pwa-512x512.png", sizes: "512x512", type: "image/png" },
+          {
+            src: "/pwa-192x192.png",
+            sizes: "192x192",
+            type: "image/png",
+            purpose: "any",
+          },
+          {
+            // Required for Android 13+ install prompt — without a maskable
+            // icon, the install sheet uses the 'any' icon, which can be
+            // cropped weirdly by the platform's mask shape.
+            src: "/pwa-maskable-512x512.png",
+            sizes: "512x512",
+            type: "image/png",
+            purpose: "maskable",
+          },
+          {
+            src: "/pwa-512x512.png",
+            sizes: "512x512",
+            type: "image/png",
+            purpose: "any",
+          },
         ],
+        // iOS reads categories from the manifest as a fallback for older
+        // OS versions; this is what shows in the "Add to Home Screen" sheet.
+        categories: ["education", "productivity"],
       },
     }),
     ...(process.env.NODE_ENV !== "production" &&
@@ -79,7 +103,7 @@ export default defineConfig({
     },
     proxy: {
       "/api": {
-        target: "http://localhost:8080",
+        target: `http://localhost:${process.env["API_PORT"] || "8080"}`,
         changeOrigin: true,
       },
     },

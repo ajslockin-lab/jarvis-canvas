@@ -1,22 +1,36 @@
 openapi: 3.1.0
 info:
-  # Do not change the title, if the title changes, the import paths will be broken
-  title: Api
+  title: CARVIS API
   version: 0.1.0
-  description: API specification
+  description: |
+    CARVIS Canvas Intelligence API — authentication, Canvas sync, voice commands,
+    reminders, and the Chrome extension agent. All authenticated endpoints require
+    a `jarvis_session` cookie or `x-session-token` header.
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: auth
+    description: Authentication (Canvas OAuth, PAT, email/password)
+  - name: canvas
+    description: Canvas LMS sync and data
+  - name: voice
+    description: Voice/command interface
+  - name: reminders
+    description: Reminder CRUD
+  - name: extension
+    description: Chrome extension agent and download
+  - name: user
+    description: User data and preferences
+
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,13 +38,669 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  # ── Auth ──────────────────────────────────────────────────────────────────
+
+  /auth/signup:
+    post:
+      operationId: signup
+      tags: [auth]
+      summary: Create account with email and password
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SignupRequest"
+      responses:
+        "200":
+          description: Account created, verification code sent
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SignupResponse"
+        "400":
+          description: Validation error
+        "409":
+          description: Email already taken
+
+  /auth/verify-email:
+    post:
+      operationId: verifyEmail
+      tags: [auth]
+      summary: Verify email with 6-digit code
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VerifyEmailRequest"
+      responses:
+        "200":
+          description: Email verified, session created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthSessionResponse"
+        "400":
+          description: Invalid or expired code
+
+  /auth/signin:
+    post:
+      operationId: signin
+      tags: [auth]
+      summary: Sign in with email and password
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SigninRequest"
+      responses:
+        "200":
+          description: Signed in
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthSessionResponse"
+        "401":
+          description: Invalid credentials or email not verified
+
+  /auth/canvas/pat:
+    post:
+      operationId: canvasPatAuth
+      tags: [auth]
+      summary: Authenticate with Canvas URL and Personal Access Token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CanvasPatRequest"
+      responses:
+        "200":
+          description: Authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CanvasPatResponse"
+        "401":
+          description: Token rejected or Canvas unreachable
+
+  /auth/canvas/start:
+    post:
+      operationId: canvasOAuthStart
+      tags: [auth]
+      summary: Start Canvas OAuth flow
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CanvasUrlRequest"
+      responses:
+        "200":
+          description: OAuth URL generated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  url:
+                    type: string
+                    description: Canvas OAuth authorization URL
+
+  /auth/signout:
+    post:
+      operationId: signout
+      tags: [auth]
+      summary: Destroy session and clear cookie
+      responses:
+        "200":
+          description: Signed out
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+
+  # ── Canvas ────────────────────────────────────────────────────────────────
+
+  /canvas/sync:
+    post:
+      operationId: canvasSync
+      tags: [canvas]
+      summary: Sync courses, assignments, and grades from Canvas
+      responses:
+        "200":
+          description: Sync completed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  courseCount:
+                    type: integer
+        "400":
+          description: Canvas not connected
+        "500":
+          description: Sync failed
+
+  /canvas/sync-status:
+    get:
+      operationId: canvasSyncStatus
+      tags: [canvas]
+      summary: Get current sync phase and status
+      responses:
+        "200":
+          description: Sync status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SyncStatus"
+
+  /canvas/grades:
+    get:
+      operationId: canvasGrades
+      tags: [canvas]
+      summary: Get all grades for current user
+      responses:
+        "200":
+          description: Grades
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GradesResponse"
+
+  /canvas/assignments/toggle:
+    patch:
+      operationId: toggleAssignment
+      tags: [canvas]
+      summary: Mark an assignment as completed or incomplete
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [assignmentId, completed]
+              properties:
+                assignmentId:
+                  type: string
+                completed:
+                  type: boolean
+      responses:
+        "200":
+          description: Updated
+        "404":
+          description: Assignment not found
+
+  /canvas/activation:
+    post:
+      operationId: recordActivation
+      tags: [canvas]
+      summary: Record a one-time activation event
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [eventType]
+              properties:
+                eventType:
+                  type: string
+                  enum: [first_sync_completed, first_question_asked, first_voice_used]
+      responses:
+        "200":
+          description: Event recorded (or deduped)
+
+  # ── Voice ─────────────────────────────────────────────────────────────────
+
+  /voice/command:
+    post:
+      operationId: voiceCommand
+      tags: [voice]
+      summary: Process a voice or text command via NLU
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [text]
+              properties:
+                text:
+                  type: string
+                  maxLength: 1000
+      responses:
+        "200":
+          description: Command processed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VoiceCommandResponse"
+
+  # ── Reminders ──────────────────────────────────────────────────────────────
+
+  /reminders:
+    get:
+      operationId: listReminders
+      tags: [reminders]
+      summary: List active reminders for current user
+      responses:
+        "200":
+          description: Reminders
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Reminder"
+    post:
+      operationId: createReminder
+      tags: [reminders]
+      summary: Create a new reminder
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateReminderRequest"
+      responses:
+        "201":
+          description: Reminder created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Reminder"
+
+  # ── Extension ──────────────────────────────────────────────────────────────
+
+  /extension/download:
+    get:
+      operationId: downloadExtension
+      tags: [extension]
+      summary: Download the Chrome extension as a ZIP
+      responses:
+        "200":
+          description: ZIP file
+          content:
+            application/zip:
+              schema:
+                type: string
+                format: binary
+
+  /extension/agent:
+    post:
+      operationId: extensionAgent
+      tags: [extension]
+      summary: Plan a page action for the Chrome extension
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ExtensionAgentRequest"
+      responses:
+        "200":
+          description: Action planned
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExtensionAgentResponse"
+
+  # ── User ───────────────────────────────────────────────────────────────────
+
+  /user/data:
+    get:
+      operationId: getUserData
+      tags: [user]
+      summary: Get current user with courses and incomplete assignments
+      responses:
+        "200":
+          description: User data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserDataResponse"
+
+  /user/preferences:
+    patch:
+      operationId: updateUserPreferences
+      tags: [user]
+      summary: Set one-time user preferences (e.g. referral source)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PreferencesRequest"
+      responses:
+        "200":
+          description: Preferences saved
+
 components:
   schemas:
     HealthStatus:
       type: object
+      required: [status]
       properties:
         status:
           type: string
-      required:
-        - status
 
+    # ── Auth schemas ──────────────────────────────────────────────────────
+
+    SignupRequest:
+      type: object
+      required: [email, name, password]
+      properties:
+        email:
+          type: string
+          format: email
+          maxLength: 254
+        name:
+          type: string
+          maxLength: 80
+        password:
+          type: string
+          minLength: 8
+          maxLength: 200
+
+    SignupResponse:
+      type: object
+      properties:
+        userId:
+          type: string
+        devCode:
+          type: string
+          nullable: true
+
+    VerifyEmailRequest:
+      type: object
+      required: [userId, code]
+      properties:
+        userId:
+          type: string
+        code:
+          type: string
+          pattern: ^\d{6}$
+
+    SigninRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+
+    CanvasUrlRequest:
+      type: object
+      required: [canvasUrl]
+      properties:
+        canvasUrl:
+          type: string
+          description: Canvas instance URL (e.g. https://school.instructure.com or https://canvas.school.edu)
+
+    CanvasPatRequest:
+      type: object
+      required: [canvasUrl, pat]
+      properties:
+        canvasUrl:
+          type: string
+        pat:
+          type: string
+          description: Canvas Personal Access Token
+
+    CanvasPatResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        user:
+          type: object
+          properties:
+            id:
+              type: string
+            email:
+              type: string
+            name:
+              type: string
+        sessionToken:
+          type: string
+
+    AuthSessionResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        sessionToken:
+          type: string
+        user:
+          type: object
+          properties:
+            id:
+              type: string
+            email:
+              type: string
+            name:
+              type: string
+            canvasBaseUrl:
+              type: string
+              nullable: true
+
+    # ── Canvas schemas ────────────────────────────────────────────────────
+
+    SyncStatus:
+      type: object
+      properties:
+        phase:
+          type: string
+          enum: [idle, courses, assignments, grades, done, error]
+        lastSyncAt:
+          type: string
+          format: date-time
+          nullable: true
+        error:
+          type: string
+          nullable: true
+        canvasBaseUrl:
+          type: string
+          nullable: true
+
+    GradesResponse:
+      type: object
+      properties:
+        grades:
+          type: array
+          items:
+            type: object
+            properties:
+              name:
+                type: string
+              code:
+                type: string
+                nullable: true
+              currentScore:
+                type: number
+                nullable: true
+              finalScore:
+                type: number
+                nullable: true
+              letterGrade:
+                type: string
+                nullable: true
+              fetchedAt:
+                type: string
+                format: date-time
+
+    # ── Voice schemas ─────────────────────────────────────────────────────
+
+    VoiceCommandResponse:
+      type: object
+      properties:
+        intent:
+          type: string
+        response:
+          type: string
+        confidence:
+          type: number
+
+    # ── Reminder schemas ──────────────────────────────────────────────────
+
+    Reminder:
+      type: object
+      properties:
+        id:
+          type: string
+        userId:
+          type: string
+        assignmentId:
+          type: string
+          nullable: true
+        type:
+          type: string
+          enum: [custom, deadline, study]
+        triggeredAt:
+          type: string
+          format: date-time
+        active:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+
+    CreateReminderRequest:
+      type: object
+      properties:
+        assignmentId:
+          type: string
+        type:
+          type: string
+          enum: [custom, deadline, study]
+          default: custom
+        triggeredAt:
+          type: string
+          description: ISO date string for when the reminder fires
+
+    # ── Extension schemas ─────────────────────────────────────────────────
+
+    ExtensionAgentRequest:
+      type: object
+      required: [command, pageContext]
+      properties:
+        command:
+          type: string
+          description: Natural language command (e.g. "open assignments")
+        pageContext:
+          type: object
+          required: [url, title, elements]
+          properties:
+            url:
+              type: string
+            title:
+              type: string
+            elements:
+              type: array
+              items:
+                type: object
+                required: [id, tag, text]
+                properties:
+                  id:
+                    type: string
+                  tag:
+                    type: string
+                  text:
+                    type: string
+                  ariaLabel:
+                    type: string
+                  placeholder:
+                    type: string
+                  href:
+                    type: string
+
+    ExtensionAgentResponse:
+      type: object
+      properties:
+        response:
+          type: string
+        action:
+          type: object
+          description: Optional page action to execute
+          oneOf:
+            - type: object
+              description: Click an element
+              properties:
+                type:
+                  type: string
+                  enum: [click]
+                elementId:
+                  type: string
+            - type: object
+              description: Fill an input
+              properties:
+                type:
+                  type: string
+                  enum: [fill]
+                elementId:
+                  type: string
+                value:
+                  type: string
+            - type: object
+              description: Scroll the page
+              properties:
+                type:
+                  type: string
+                  enum: [scroll]
+                direction:
+                  type: string
+                  enum: [up, down]
+            - type: object
+              description: Navigate to a URL
+              properties:
+                type:
+                  type: string
+                  enum: [navigate]
+                url:
+                  type: string
+        blocked:
+          type: boolean
+          description: True when the command involves a risky action (submit, delete)
+
+    # ── User schemas ──────────────────────────────────────────────────────
+
+    UserDataResponse:
+      type: object
+      properties:
+        user:
+          type: object
+          properties:
+            id:
+              type: string
+            email:
+              type: string
+            name:
+              type: string
+            canvasBaseUrl:
+              type: string
+              nullable: true
+        courses:
+          type: array
+          items:
+            type: object
+        hasData:
+          type: boolean
+
+    PreferencesRequest:
+      type: object
+      required: [referredFrom]
+      properties:
+        referredFrom:
+          type: string
+          enum: [friend, classmate, reddit, twitter, school_email, search, other]
