@@ -130,6 +130,23 @@ export const activationEventsTable = pgTable("activation_events", {
   occurredAt: timestamp("occurred_at").notNull().defaultNow(),
 });
 
+// Web-push subscription store. One row per (user, endpoint) — the endpoint
+// is the unique key the push service gives each subscription, so re-subscribes
+// on the same device update the existing row in place. Cascade-deletes with
+// the user so unsubscribe-on-account-delete is automatic.
+export const pushSubscriptionsTable = pgTable("push_subscriptions", {
+  id: serial("id").primaryKey(),
+  userId: text("user_id").notNull().references(() => usersTable.id, { onDelete: "cascade" }),
+  // The endpoint URL the push service uses to deliver this subscription.
+  // Unique globally — see DELETE /api/push/subscribe.
+  endpoint: text("endpoint").notNull().unique(),
+  // ECDH public key + auth secret from PushSubscription.getKey(). Encoded as
+  // base64url strings, which is what the web-push library expects.
+  p256dh: text("p256dh").notNull(),
+  auth: text("auth").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
 export const insertUserSchema = createInsertSchema(usersTable).omit({
   createdAt: true,
   updatedAt: true,
@@ -161,6 +178,7 @@ export type Reminder = typeof remindersTable.$inferSelect;
 export type Conversation = typeof conversationsTable.$inferSelect;
 export type ActivationEvent = typeof activationEventsTable.$inferSelect;
 export type EmailVerification = typeof emailVerificationsTable.$inferSelect;
+export type PushSubscription = typeof pushSubscriptionsTable.$inferSelect;
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type InsertCourse = z.infer<typeof insertCourseSchema>;

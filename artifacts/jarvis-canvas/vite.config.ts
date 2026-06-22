@@ -20,11 +20,25 @@ export default defineConfig({
     tailwindcss(),
     runtimeErrorOverlay(),
     VitePWA({
-      registerType: "autoUpdate",
+      registerType: "prompt",
+      strategies: "injectManifest",
+      srcDir: "src",
+      filename: "sw.ts",
+      injectRegister: false,
+      injectManifest: {
+        // No precache entries — the user asked for no offline support, so
+        // there's nothing worth serving from disk. We still register a
+        // service worker because the browser only delivers push events
+        // to pages controlled by one.
+        globPatterns: [],
+        maximumFileSizeToCacheInBytes: 0,
+      },
       devOptions: {
         enabled: true,
+        type: "module",
+        navigateFallback: "index.html",
       },
-      includeAssets: ["favicon.svg", "robots.txt", "apple-touch-icon.png"],
+      includeAssets: ["favicon.svg", "robots.txt", "apple-touch-icon.png", "manifest.webmanifest"],
       manifest: {
         name: "Carvis — Canvas Assistant",
         short_name: "Carvis",

@@ -1,17 +1,24 @@
 import { useState, useEffect } from "react";
-import { Volume2, VolumeX, Bell, BellOff, Moon, User, AlertCircle, RefreshCw, ArrowLeft, LogOut } from "lucide-react";
+import { Volume2, VolumeX, Bell, BellOff, Moon, User, AlertCircle, RefreshCw, ArrowLeft, LogOut, Loader2 } from "lucide-react";
 import CanvasConnectButton from "@/components/auth/CanvasConnectButton";
 import { Link, useLocation } from "wouter";
+import { usePush, type PushPermission } from "@/hooks/use-push";
 
 export default function SettingsPage() {
   const [, navigate] = useLocation();
   const [ttsEnabled, setTtsEnabled] = useState(true);
-  const [proactiveAlerts, setProactiveAlerts] = useState(true);
   const [energyLevel, setEnergyLevel] = useState(3);
   const [syncing, setSyncing] = useState(false);
   const [syncResult, setSyncResult] = useState<string | null>(null);
   const [canvasConnected, setCanvasConnected] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
+
+  // Web-push: real subscription via the service worker. The hook reports
+  // its capability state — we render a permission badge and toggle that
+  // match what the browser actually allows.
+  const push = usePush();
+  const [pushBusy, setPushBusy] = useState(false);
+  const [pushError, setPushError] = useState<string | null>(null);
 
   useEffect(() => {
     fetch("/api/user/data", { credentials: "include" })
@@ -35,6 +42,28 @@ export default function SettingsPage() {
       setSyncResult("Sync error. Try again.");
     } finally {
       setSyncing(false);
+    }
+  };
+
+  const handlePushToggle = async () => {
+    setPushBusy(true);
+    setPushError(null);
+    try {
+      if (push.permission === "granted") {
+        const ok = await push.optOut();
+        if (!ok) setPushError("Couldn't unsubscribe — try again.");
+      } else if (push.permission === "default") {
+        const ok = await push.optIn();
+        if (!ok) setPushError("Browser blocked the permission request.");
+      } else {
+        // "denied" — only browser settings can flip this. Surface a hint
+        // instead of pretending we can do anything.
+        setPushError("Notifications are blocked in your browser settings.");
+      }
+    } catch (err) {
+      setPushError((err as Error).message || "Push error");
+    } finally {
+      setPushBusy(false);
     }
   };
 
@@ -107,12 +136,12 @@ export default function SettingsPage() {
               enabled={ttsEnabled}
               onToggle={() => setTtsEnabled(!ttsEnabled)}
             />
-            <ToggleRow
-              icon={proactiveAlerts ? <Bell className="w-4 h-4" /> : <BellOff className="w-4 h-4" />}
-              label="PROACTIVE ALERTS"
-              description="Get notifications about deadlines, grades, and study time"
-              enabled={proactiveAlerts}
-              onToggle={() => setProactiveAlerts(!proactiveAlerts)}
+            <PushToggleRow
+              support={push.support}
+              permission={push.permission}
+              busy={pushBusy}
+              onToggle={handlePushToggle}
+              error={pushError}
             />
           </div>
         </SettingsSection>
@@ -207,6 +236,97 @@ function ToggleRow({ icon, label, description, enabled, onToggle }: { icon: Reac
       <button onClick={onToggle} className={`relative w-12 h-6 transition-colors rounded-full ${enabled ? "bg-[#FF4444]/40" : "bg-[#0a0000] border border-[rgba(160,21,21,0.15)]"}`}>
         <div className={`absolute top-0.5 w-5 h-5 transition-transform shadow-sm rounded-full ${enabled ? "translate-x-6 bg-[#FF4444]" : "translate-x-0.5 bg-[rgba(245,245,245,0.35)]"}`} />
       </button>
+    </div>
+  );
+}
+
+// PushToggleRow — variant of ToggleRow that surfaces the real push state.
+// Renders the correct visual for each combination of {support, permission}
+// and lets the user opt in / opt out via the service worker.
+//
+// States:
+//   loading         → spinner (waiting for /api/push/vapid-public-key)
+//   unsupported     → muted copy: "Not available — server not configured"
+//   denied          → red X badge, toggle is a no-op (browser blocked it)
+//   default         → red bell, toggle triggers requestPermission() + subscribe
+//   granted         → green bell, toggle unsubscribes
+function PushToggleRow({
+  support,
+  permission,
+  busy,
+  onToggle,
+  error,
+}: {
+  support: "loading" | "unsupported" | "ready";
+  permission: PushPermission;
+  busy: boolean;
+  onToggle: () => void;
+  error: string | null;
+}) {
+  if (support === "loading") {
+    return (
+      <div className="flex items-center justify-between py-2">
+        <div className="flex items-center gap-3">
+          <div className="p-1.5 border border-[rgba(160,21,21,0.15)] text-[rgba(245,245,245,0.4)] rounded">
+            <Loader2 className="w-4 h-4 animate-spin" />
+          </div>
+          <div>
+            <p className="font-orbitron text-[11px] font-bold tracking-[0.1em] text-[#f5f5f5]">PUSH NOTIFICATIONS</p>
+            <p className="font-rajdhani text-[11px] text-[rgba(245,245,245,0.4)]">Checking browser support…</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (support === "unsupported") {
+    return (
+      <div className="flex items-center justify-between py-2">
+        <div className="flex items-center gap-3">
+          <div className="p-1.5 border border-[rgba(160,21,21,0.15)] text-[rgba(245,245,245,0.4)] rounded">
+            <BellOff className="w-4 h-4" />
+          </div>
+          <div>
+            <p className="font-orbitron text-[11px] font-bold tracking-[0.1em] text-[#f5f5f5]">PUSH NOTIFICATIONS</p>
+            <p className="font-rajdhani text-[11px] text-[rgba(245,245,245,0.4)]">Not available on this device or server not configured</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const enabled = permission === "granted";
+  const icon = permission === "denied" ? <BellOff className="w-4 h-4" /> : <Bell className="w-4 h-4" />;
+  const description =
+    permission === "granted"
+      ? "Reminders and deadlines will arrive as system notifications"
+      : permission === "denied"
+        ? "Blocked in browser settings — open site permissions to enable"
+        : "Reminders and deadlines will arrive as system notifications";
+
+  return (
+    <div className="py-2">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className={`p-1.5 border rounded ${permission === "denied" ? "border-[#FF4444]/30 text-[#FF4444]" : "border-[rgba(160,21,21,0.15)] text-[rgba(245,245,245,0.4)]"}`}>
+            {icon}
+          </div>
+          <div>
+            <p className="font-orbitron text-[11px] font-bold tracking-[0.1em] text-[#f5f5f5]">PUSH NOTIFICATIONS</p>
+            <p className="font-rajdhani text-[11px] text-[rgba(245,245,245,0.4)]">{description}</p>
+          </div>
+        </div>
+        <button
+          onClick={onToggle}
+          disabled={busy}
+          className={`relative w-12 h-6 transition-colors rounded-full ${enabled ? "bg-[#FF4444]/40" : "bg-[#0a0000] border border-[rgba(160,21,21,0.15)]"} disabled:opacity-50`}
+        >
+          <div className={`absolute top-0.5 w-5 h-5 transition-transform shadow-sm rounded-full ${enabled ? "translate-x-6 bg-[#FF4444]" : "translate-x-0.5 bg-[rgba(245,245,245,0.35)]"}`} />
+        </button>
+      </div>
+      {error && (
+        <p className="font-rajdhani text-[10px] text-[#FF9500] mt-1.5 pl-11">{error}</p>
+      )}
     </div>
   );
 }

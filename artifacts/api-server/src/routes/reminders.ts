@@ -1,9 +1,10 @@
 import { Router } from "express";
 import { randomBytes } from "crypto";
 import { db } from "@workspace/db";
-import { remindersTable } from "@workspace/db/schema";
-import { eq, and } from "drizzle-orm";
+import { remindersTable, assignmentsTable } from "@workspace/db/schema";
+import { eq, and, lte, gte } from "drizzle-orm";
 import { requireAuth } from "../lib/auth.js";
+import { sendPushToUser } from "../lib/webpush.js";
 import { z } from "zod";
 
 const router = Router();
@@ -12,6 +13,9 @@ const createReminderSchema = z.object({
   assignmentId: z.string().optional(),
   type: z.enum(["custom", "deadline", "study"]).default("custom"),
   triggeredAt: z.string(),
+  title: z.string().min(1).max(120).optional(),
+  body: z.string().min(1).max(280).optional(),
+  url: z.string().url().max(2048).optional(),
 });
 
 const updateReminderSchema = z.object({
@@ -50,7 +54,30 @@ router.post("/reminders", async (req, res) => {
       return;
     }
 
-    const { assignmentId, type, triggeredAt } = parsed.data;
+    const { assignmentId, type, triggeredAt, title, body, url } = parsed.data;
+
+    // If the reminder is tied to an assignment, pull its name + course so
+    // the push notification has something meaningful to say. Otherwise fall
+    // back to the caller's title/body or a generic "Carvis" prefix.
+    let pushTitle = title ?? "Carvis";
+    let pushBody = body ?? "You have a reminder.";
+    let pushUrl = url;
+    if (assignmentId) {
+      const [assignment] = await db
+        .select({
+          name: assignmentsTable.name,
+          dueDate: assignmentsTable.dueDate,
+          url: assignmentsTable.url,
+        })
+        .from(assignmentsTable)
+        .where(eq(assignmentsTable.id, assignmentId))
+        .limit(1);
+      if (assignment) {
+        pushTitle = title ?? "Assignment due soon";
+        pushBody = body ?? assignment.name;
+        pushUrl = url ?? assignment.url ?? undefined;
+      }
+    }
 
     const [reminder] = await db
       .insert(remindersTable)
@@ -64,6 +91,15 @@ router.post("/reminders", async (req, res) => {
       })
       .returning();
 
+    // If the reminder fires within 60 seconds, send the push now rather
+    // than waiting for a scheduler tick (the scheduler is still TBD — for
+    // now, immediate reminders cover the assignment-deadline use case the
+    // client creates from the dashboard).
+    const due = new Date(triggeredAt).getTime();
+    if (due - Date.now() <= 60_000) {
+      void sendPushToUser(user.id, { title: pushTitle, body: pushBody, url: pushUrl });
+    }
+
     res.status(201).json(reminder);
   } catch (err) {
     console.error("Create reminder error:", err);
@@ -71,7 +107,7 @@ router.post("/reminders", async (req, res) => {
   }
 });
 
-// PATCH /api/reminders — update (dismiss) a reminder
+// PATCH /api/reminders — update (dismiss) reminder
 router.patch("/reminders", async (req, res) => {
   const user = await requireAuth(req, res);
   if (!user) return;
@@ -104,7 +140,35 @@ router.patch("/reminders", async (req, res) => {
     res.json(updated);
   } catch (err) {
     console.error("Update reminder error:", err);
-    res.status(500).json({ error: "Failed to update reminder" });
+    res.status(500).json({ error: "Failed to update reminders" });
+  }
+});
+
+// GET /api/reminders/due — list reminders due in the next 5 minutes for
+// the current user. Used by future scheduler work — kept simple here so
+// the route can be polled cheaply without re-querying everything.
+router.get("/reminders/due", async (req, res) => {
+  const user = await requireAuth(req, res);
+  if (!user) return;
+
+  try {
+    const now = new Date();
+    const horizon = new Date(now.getTime() + 5 * 60_000);
+    const due = await db
+      .select()
+      .from(remindersTable)
+      .where(
+        and(
+          eq(remindersTable.userId, user.id),
+          eq(remindersTable.active, true),
+          gte(remindersTable.triggeredAt, now),
+          lte(remindersTable.triggeredAt, horizon),
+        ),
+      );
+    res.json(due);
+  } catch (err) {
+    console.error("List due reminders error:", err);
+    res.status(500).json({ error: "Failed to fetch due reminders" });
   }
 });
 
