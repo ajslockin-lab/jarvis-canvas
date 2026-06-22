@@ -15,28 +15,39 @@
 //
 // In dev, the SW is served by vite-plugin-pwa's devOptions (type: "module"),
 // so this file is what runs in `pnpm dev` too.
+//
+// tsc note: this file uses `ServiceWorkerGlobalScope` types, but the main
+// tsconfig includes `dom` lib (not `webworker`). The vite-plugin-pwa build
+// uses esbuild which strips types — runtime is fine. We use targeted `as`
+// casts to satisfy tsc without pulling in a second tsconfig just for this
+// file.
 
-declare const self: ServiceWorkerGlobalScope;
+// `self` is typed as `Window & typeof globalThis` by the dom lib, but at
+// runtime in a service worker it IS a ServiceWorkerGlobalScope. Cast
+// through `unknown` to bridge the type gap without `// @ts-expect-error`.
+// Alias it locally so the rest of the file reads naturally.
+const sw = self as unknown as ServiceWorkerGlobalScope;
 
-self.addEventListener("install", () => {
+sw.addEventListener("install", () => {
   // Skip waiting so the SW becomes active on the very first install. This
   // is what allows push to work right after the user opts in — otherwise
   // a push sent before the SW is fully active would be dropped.
-  void self.skipWaiting();
+  void sw.skipWaiting();
 });
 
-self.addEventListener("activate", (event) => {
+sw.addEventListener("activate", (event) => {
   // Claim any uncontrolled clients so the next push event has a target.
-  event.waitUntil(self.clients.claim());
+  event.waitUntil(sw.clients.claim());
 });
 
-self.addEventListener("push", (event) => {
-  if (!event.data) {
+sw.addEventListener("push", (event) => {
+  const pushEvent = event as PushEvent;
+  if (!pushEvent.data) {
     // Push with no payload is invalid per the Web Push protocol. We can
     // still show a generic notification so the user isn't left wondering
     // why their phone buzzed.
-    event.waitUntil(
-      self.registration.showNotification("Carvis", {
+    pushEvent.waitUntil(
+      sw.registration.showNotification("Carvis", {
         body: "You have a new notification.",
         icon: "/pwa-192x192.png",
       }),
@@ -46,10 +57,10 @@ self.addEventListener("push", (event) => {
 
   let payload: { title?: string; body?: string; url?: string; tag?: string; icon?: string } = {};
   try {
-    payload = event.data.json();
+    payload = pushEvent.data.json();
   } catch {
     // Non-JSON payload — treat as plain text.
-    payload = { body: event.data.text() };
+    payload = { body: pushEvent.data.text() };
   }
 
   const title = payload.title || "Carvis";
@@ -63,29 +74,30 @@ self.addEventListener("push", (event) => {
     data: { url: payload.url },
   };
 
-  event.waitUntil(self.registration.showNotification(title, options));
+  pushEvent.waitUntil(sw.registration.showNotification(title, options));
 });
 
-self.addEventListener("notificationclick", (event) => {
-  event.notification.close();
+sw.addEventListener("notificationclick", (event) => {
+  const clickEvent = event as NotificationEvent;
+  clickEvent.notification.close();
 
-  const targetUrl = (event.notification.data as { url?: string } | undefined)?.url;
+  const targetUrl = (clickEvent.notification.data as { url?: string } | undefined)?.url;
   if (!targetUrl) {
     // No URL — just focus the app.
-    event.waitUntil(
-      self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((windowClients) => {
+    clickEvent.waitUntil(
+      sw.clients.matchAll({ type: "window", includeUncontrolled: true }).then((windowClients) => {
         if (windowClients.length > 0) {
           const client = windowClients[0] as WindowClient;
           return client.focus();
         }
-        return self.clients.openWindow("/");
+        return sw.clients.openWindow("/");
       }),
     );
     return;
   }
 
-  event.waitUntil(
-    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((windowClients) => {
+  clickEvent.waitUntil(
+    sw.clients.matchAll({ type: "window", includeUncontrolled: true }).then((windowClients) => {
       // Try to focus a tab that's already on the target URL.
       for (const client of windowClients) {
         const wc = client as WindowClient;
@@ -94,7 +106,7 @@ self.addEventListener("notificationclick", (event) => {
         }
       }
       // Otherwise open a new tab.
-      return self.clients.openWindow(targetUrl);
+      return sw.clients.openWindow(targetUrl);
     }),
   );
 });

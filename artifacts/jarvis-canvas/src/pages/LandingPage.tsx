@@ -12,31 +12,10 @@ export default function LandingPage() {
   const [, navigate] = useLocation();
   const isMobile = useIsMobile();
 
-  // Skip the marketing page for users who are here to USE the app, not browse it.
-  //
-  // Two signals qualify:
-  //   1. They installed the PWA (display-mode: standalone) — they already saw
-  //      the marketing and chose to add it to their home screen. The "use the
-  //      app" intent is unambiguous.
-  //   2. They're on a mobile viewport. Mobile users rarely read marketing
-  //      pages; they want the product. The whole marketing site is a
-  //      desktop-first experience.
-  //
-  // Desktop users without the PWA installed keep the marketing page — that's
-  // still the surface where they evaluate the product and discover the
-  // install CTA.
-  //
-  // We land on /signup rather than /signin because the new account flow
-  // starts with signup. If the visitor already has a session from a previous
-  // account, /signup will still let them fill out the form — if they enter
-  // an email that's already taken they'll get an email_taken error with a
-  // link to /signin. (Previously this used to auto-redirect to /dashboard,
-  // which made the page unusable on mobile for returning visitors.)
   useEffect(() => {
     if (typeof window === "undefined") return;
     const isStandalone =
       window.matchMedia("(display-mode: standalone)").matches ||
-      // iOS Safari uses navigator.standalone as the standalone signal
       (navigator as unknown as { standalone?: boolean }).standalone === true;
 
     if (isStandalone || isMobile) {
@@ -70,8 +49,9 @@ export default function LandingPage() {
         <div className="flex items-center gap-2">
           <img src="/carvis-logo.png" alt="" className="h-8 w-8 object-contain" />
           <span className="text-lg font-bold tracking-[0.2em] text-[#FF4444]">CARVIS</span>
-        </div>
+       </div>
         <div className="hidden md:flex items-center gap-8">
+          <a href="#demo" className="text-sm text-slate-400 hover:text-white transition">Demo</a>
           <a href="#features" className="text-sm text-slate-400 hover:text-white transition">Features</a>
           <a href="#how-it-works" className="text-sm text-slate-400 hover:text-white transition">How It Works</a>
           <a href="#extension" className="text-sm text-slate-400 hover:text-white transition">Extension</a>
@@ -87,22 +67,23 @@ export default function LandingPage() {
             }`}
           >
             {isInstalled ? "App Installed" : isInstallable ? "Install App" : "Add to Home Screen"}
-          </button>
+         </button>
           <Link href="/dashboard" className="text-sm font-medium text-white bg-white/10 hover:bg-white/20 px-4 py-2 rounded-lg transition border border-white/10">
             Desktop App
-          </Link>
-        </div>
+         </Link>
+       </div>
         <button className="md:hidden text-white/70" onClick={() => setMenuOpen(!menuOpen)}>
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
-        </button>
-      </nav>
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="18" x2="21" y2="18" /></svg>
+       </button>
+     </nav>
 
       {menuOpen && (
         <div className="fixed inset-0 z-[60] bg-[#060911]/98 backdrop-blur-xl md:hidden p-8 pt-20">
           <button className="absolute top-4 right-4 text-white/50" onClick={() => setMenuOpen(false)}>
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-          </button>
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y1="18" /><line x1="6" y1="6" x2="18" y1="18" /></svg>
+         </button>
           <div className="flex flex-col gap-6">
+            <a href="#demo" onClick={() => setMenuOpen(false)} className="text-xl text-slate-300 hover:text-white transition">Demo</a>
             <a href="#features" onClick={() => setMenuOpen(false)} className="text-xl text-slate-300 hover:text-white transition">Features</a>
             <a href="#how-it-works" onClick={() => setMenuOpen(false)} className="text-xl text-slate-300 hover:text-white transition">How It Works</a>
             <a href="#extension" onClick={() => setMenuOpen(false)} className="text-xl text-slate-300 hover:text-white transition">Chrome Extension</a>
@@ -114,10 +95,10 @@ export default function LandingPage() {
               className={`text-xl transition text-left ${isInstallable ? "text-[#FF4444] hover:text-[#ff6b3d]" : "text-slate-500 cursor-not-allowed"}`}
             >
               {isInstalled ? "App Installed" : "Install App"}
-            </button>
+           </button>
             <Link href="/dashboard" onClick={() => setMenuOpen(false)} className="text-xl text-[#FF4444] hover:text-[#ff6b3d] transition">Desktop App</Link>
-          </div>
-        </div>
+         </div>
+       </div>
       )}
 
       <section className="relative min-h-screen flex items-center justify-center px-6 pt-24 pb-16 overflow-hidden">
@@ -127,47 +108,27 @@ export default function LandingPage() {
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[#FF4444]/10 border border-[#FF4444]/20 text-[#FF4444] text-sm font-medium mb-8">
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
             Actively Building — Join the Beta
-          </div>
+         </div>
           <h1 className="text-5xl md:text-7xl font-extrabold tracking-tight mb-6 leading-[1.1]">
             Meet <span className="text-[#FF4444]">CARVIS</span>.<br />
             Your AI That Actually<br />Understands Canvas.
-          </h1>
+         </h1>
           <p className="text-lg md:text-xl text-slate-400 max-w-2xl mx-auto mb-10 leading-relaxed">
             Stop drowning in assignments. CARVIS connects directly to your Canvas, tracks every deadline, reads your modules, and explains anything — all with a voice assistant that feels like talking to a tutor who actually cares.
-          </p>
+         </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center mb-16">
             <Link href="/signin" className="inline-flex items-center justify-center gap-2 px-8 py-4 rounded-xl bg-white text-black font-semibold text-lg hover:bg-slate-200 transition shadow-lg shadow-white/10">
               Start Your Free Setup <ArrowRight className="w-5 h-5" />
-            </Link>
-            <button className="inline-flex items-center justify-center gap-2 px-8 py-4 rounded-xl bg-white/5 text-white font-semibold text-lg border border-white/10 hover:bg-white/10 transition">
+           </Link>
+            <a href="#demo" className="inline-flex items-center justify-center gap-2 px-8 py-4 rounded-xl bg-white/5 text-white font-semibold text-lg border border-white/10 hover:bg-white/10 transition">
               Watch How It Works
-            </button>
-          </div>
+           </a>
+         </div>
 
-          <div className="max-w-2xl mx-auto rounded-2xl border border-white/10 bg-white/[0.03] backdrop-blur-xl p-6 text-left shadow-2xl">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-9 h-9 rounded-full bg-[#FF4444]/15 border border-[#FF4444]/25 flex items-center justify-center text-lg">🎓</div>
-              <div>
-                <div className="font-semibold text-sm">CARVIS Assistant</div>
-                <div className="text-xs text-emerald-400 flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" /> Online — Connected to Canvas
-                </div>
-              </div>
-            </div>
-            <div className="space-y-3">
-              <div className="p-3.5 rounded-xl bg-[#FF4444]/10 border border-[#FF4444]/15 text-sm text-slate-200 leading-relaxed">
-                Hey! I pulled your Canvas for this week. You have <span className="text-emerald-400 font-semibold">4 assignments</span> due, and your <span className="text-red-400 font-semibold">⚠️ Calc II problem set</span> is due tomorrow at 11:59 PM. Want me to walk through the first module on integrals, or should I break this into a study plan?
-              </div>
-              <div className="p-3.5 rounded-xl bg-white/5 border border-white/10 text-sm text-slate-300 ml-6 leading-relaxed">
-                Can you explain the substitution method from Module 4? I'm lost.
-              </div>
-              <div className="p-3.5 rounded-xl bg-[#FF4444]/10 border border-[#FF4444]/15 text-sm text-slate-200 leading-relaxed">
-                Absolutely — pulling Module 4 now. Here's substitution in 3 steps: <span className="text-emerald-400 font-semibold">(1)</span> Pick a part to be 'u', <span className="text-emerald-400 font-semibold">(2)</span> Find du/dx, <span className="text-emerald-400 font-semibold">(3)</span> Rewrite in terms of u and integrate. Want me to walk through the first example?
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
+          {/* Cinematic auto-play demo — plays when scrolled into view */}
+          <CinematicDemo active={true} />
+       </div>
+     </section>
 
       <div className="border-y border-white/5 bg-white/[0.02]">
         <div className="max-w-5xl mx-auto px-6 py-10 flex flex-wrap justify-center gap-12 md:gap-16">
@@ -180,10 +141,10 @@ export default function LandingPage() {
             <div key={stat.label} className="text-center">
               <div className="text-3xl font-extrabold text-white mb-1">{stat.num}</div>
               <div className="text-sm text-slate-500">{stat.label}</div>
-            </div>
+           </div>
           ))}
-        </div>
-      </div>
+       </div>
+     </div>
 
       <section id="features" className="py-24 px-6">
         <div className="max-w-6xl mx-auto">
@@ -191,8 +152,8 @@ export default function LandingPage() {
             <div className="text-xs font-bold tracking-[0.3em] text-[#FF4444] uppercase mb-4">Features</div>
             <h2 className="text-4xl md:text-5xl font-extrabold tracking-tight text-white mb-4">
               Everything You Need to<br /><span className="text-[#FF6B3D]">Crush Your Semester</span>
-            </h2>
-          </div>
+           </h2>
+         </div>
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
             {[
               { icon: <Calendar className="w-6 h-6" />, title: "Smart Deadline Tracking", desc: "CARVIS syncs directly with Canvas and shows exactly what's due, when, and how urgent — color-coded and sorted so you never miss a deadline.", color: "text-[#FF4444]" },
@@ -207,11 +168,11 @@ export default function LandingPage() {
                 <div className={`mb-4 ${f.color}`}>{f.icon}</div>
                 <h3 className="font-orbitron text-sm font-bold tracking-wide text-[#f5f5f5] mb-2">{f.title}</h3>
                 <p className="font-rajdhani text-[13px] text-[rgba(245,245,245,0.4)] leading-relaxed">{f.desc}</p>
-              </div>
+             </div>
             ))}
-          </div>
-        </div>
-      </section>
+         </div>
+       </div>
+     </section>
 
       <section id="how-it-works" className="py-24 px-6 bg-white/[0.015]">
         <div className="max-w-4xl mx-auto text-center fade-in">
@@ -228,25 +189,24 @@ export default function LandingPage() {
                 <div className="font-mono-data text-4xl font-bold text-[#FF4444]/20 mb-4">{s.step}</div>
                 <h3 className="font-orbitron text-sm font-bold tracking-wide text-[#FF4444] mb-2">{s.title}</h3>
                 <p className="font-rajdhani text-[13px] text-[rgba(245,245,245,0.4)] leading-relaxed">{s.desc}</p>
-              </div>
+             </div>
             ))}
-          </div>
-        </div>
-      </section>
+         </div>
+       </div>
+     </section>
 
-      {/* Chrome Extension Section */}
       <section id="extension" className="py-24 px-6 bg-[rgba(255,30,30,0.03)] border-y border-[rgba(160,21,21,0.12)]">
         <div className="max-w-5xl mx-auto fade-in">
           <div className="text-center mb-16">
             <div className="text-xs font-bold tracking-[0.3em] text-[#FF4444] uppercase mb-4">Chrome Extension</div>
             <h2 className="text-4xl md:text-5xl font-extrabold tracking-tight text-white mb-4">
               CARVIS <span className="text-[#FF6B3D]">Inside Canvas</span>
-            </h2>
+           </h2>
             <p className="text-slate-400 max-w-2xl mx-auto leading-relaxed">
               A floating red bubble on every Canvas page — click it to see your deadlines, grades,
               and talk to the AI agent. The extension controls the Canvas page for you.
-            </p>
-          </div>
+           </p>
+         </div>
 
           <div className="grid md:grid-cols-3 gap-6 mb-12">
             {[
@@ -259,9 +219,9 @@ export default function LandingPage() {
                 <div className={`mb-4 ${f.color}`}>{f.icon}</div>
                 <h3 className="font-orbitron text-sm font-bold tracking-wide text-[#f5f5f5] mb-2">{f.title}</h3>
                 <p className="font-rajdhani text-[13px] text-[rgba(245,245,245,0.4)] leading-relaxed">{f.desc}</p>
-              </div>
+             </div>
             ))}
-          </div>
+         </div>
 
           <div className="text-center">
             <Link
@@ -269,13 +229,13 @@ export default function LandingPage() {
               className="inline-flex items-center justify-center gap-2 px-8 py-4 rounded-xl bg-[#FF4444] text-white font-semibold text-lg hover:bg-[#ff6b3d] transition shadow-lg shadow-[#FF4444]/25"
             >
               <Download className="w-5 h-5" /> Download Extension & Setup Guide
-            </Link>
+           </Link>
             <p className="font-rajdhani text-[12px] text-slate-600 mt-3">
               Free. No Chrome Web Store account needed. 5-step install.
-            </p>
-          </div>
-        </div>
-      </section>
+           </p>
+         </div>
+       </div>
+     </section>
 
       <section id="mobile-app" className="py-24 px-6 bg-white/[0.015]">
         <div className="max-w-4xl mx-auto fade-in">
@@ -284,19 +244,19 @@ export default function LandingPage() {
               <div className="text-xs font-bold tracking-[0.3em] text-[#FF4444] uppercase mb-4">Mobile PWA</div>
               <h2 className="text-4xl font-extrabold text-white mb-4">
                 CARVIS in Your <span className="text-[#FF6B3D]">Pocket</span>
-              </h2>
+             </h2>
               <p className="text-slate-400 leading-relaxed mb-6">
                 Install CARVIS directly on your phone or tablet — voice commands, deadline alerts, and grades on the go.
                 Works as a PWA: add to your home screen for a full-screen, offline-capable mobile experience.
-              </p>
+             </p>
               <ul className="space-y-3 mb-8">
                 {["Bottom-nav mobile dashboard", "Tap the voice orb to ask anything", "Install on iOS & Android (tap below)", "Syncs with your desktop account"].map((item) => (
                   <li key={item} className="flex items-center gap-2 text-sm text-slate-300">
                     <Check className="w-4 h-4 text-[#FF4444] shrink-0" />
                     {item}
-                  </li>
+                 </li>
                 ))}
-              </ul>
+             </ul>
               <button
                 onClick={() => void promptInstall()}
                 disabled={!isInstallable}
@@ -313,36 +273,36 @@ export default function LandingPage() {
                 ) : (
                   <><Smartphone className="w-5 h-5" /> Add to Home Screen</>
                 )}
-              </button>
-            </div>
+             </button>
+           </div>
             <div className="hud-panel p-6 max-w-xs mx-auto md:ml-auto">
               <span className="corner-br" />
               <div className="rounded-2xl border border-[rgba(160,21,21,0.2)] bg-black/60 p-4 space-y-3">
                 <div className="flex items-center gap-2 pb-3 border-b border-[rgba(160,21,21,0.15)]">
                   <img src="/carvis-logo.png" alt="" className="h-6 w-6 object-contain" />
                   <span className="font-orbitron text-xs font-bold text-[#FF4444] tracking-wider">CARVIS</span>
-                </div>
+               </div>
                 <div className="grid grid-cols-2 gap-2 text-center">
                   <div className="rounded-lg bg-[rgba(255,30,30,0.08)] p-3">
                     <div className="font-mono-data text-2xl font-bold text-[#FF9500]">3</div>
                     <div className="text-[9px] text-slate-500 uppercase tracking-wider">Due Today</div>
-                  </div>
+                 </div>
                   <div className="rounded-lg bg-[rgba(255,30,30,0.08)] p-3">
                     <div className="font-mono-data text-2xl font-bold text-[#FF4444]">12</div>
                     <div className="text-[9px] text-slate-500 uppercase tracking-wider">This Week</div>
-                  </div>
-                </div>
+                 </div>
+               </div>
                 <div className="flex justify-center pt-2">
                   <div className="w-14 h-14 rounded-full border-2 border-[#FF4444] bg-[rgba(255,30,30,0.12)] flex items-center justify-center shadow-[0_0_24px_rgba(255,68,68,0.35)]">
                     <Mic className="w-6 h-6 text-[#FF4444]" />
-                  </div>
-                </div>
+                 </div>
+               </div>
                 <p className="text-center text-[10px] text-slate-500 tracking-wide">Hold to speak</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
+             </div>
+           </div>
+         </div>
+       </div>
+     </section>
 
       <section id="macbook" className="py-24 px-6 bg-[rgba(255,30,30,0.03)] border-y border-[rgba(160,21,21,0.12)]">
         <div className="max-w-5xl mx-auto fade-in">
@@ -350,14 +310,13 @@ export default function LandingPage() {
             <div className="text-xs font-bold tracking-[0.3em] text-[#FF4444] uppercase mb-4">MacBook Variant</div>
             <h2 className="text-4xl md:text-5xl font-extrabold tracking-tight text-white mb-4">
               CARVIS, <span className="text-[#FF6B3D]">Natively on macOS</span>
-            </h2>
+           </h2>
             <p className="text-slate-400 max-w-2xl mx-auto leading-relaxed">
               A floating desktop orb, deep macOS automation, screen awareness, and hands-free voice control.
               Fully local — your keys never leave your machine.
-            </p>
-          </div>
+           </p>
+         </div>
 
-          {/* Feature overview grid */}
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 mb-16">
             {[
               { icon: <Laptop className="w-6 h-6" />, title: "Floating Desktop Orb", desc: "Transparent Three.js particle overlay on your desktop — always visible, always listening. Click or clap to activate.", color: "text-[#FF4444]" },
@@ -372,19 +331,18 @@ export default function LandingPage() {
                 <div className={`mb-4 ${f.color}`}>{f.icon}</div>
                 <h3 className="font-orbitron text-sm font-bold tracking-wide text-[#f5f5f5] mb-2">{f.title}</h3>
                 <p className="font-rajdhani text-[13px] text-[rgba(245,245,245,0.4)] leading-relaxed">{f.desc}</p>
-              </div>
+             </div>
             ))}
-          </div>
+         </div>
 
-          {/* Setup instructions */}
           <div className="hud-panel p-8">
             <span className="corner-br" />
             <div className="flex items-center gap-3 mb-6">
               <div className="p-1.5 border border-[rgba(255,68,68,0.25)] text-[#FF4444] rounded">
                 <Laptop className="w-5 h-5" />
-              </div>
+             </div>
               <h3 className="font-orbitron text-xs font-bold tracking-[0.2em] text-[#FF4444] uppercase">Install & Run on macOS</h3>
-            </div>
+           </div>
             <div className="space-y-4">
               <div className="flex gap-4">
                 <span className="font-mono-data text-lg font-bold text-[#FF4444]/30 shrink-0 w-6">1</span>
@@ -392,8 +350,8 @@ export default function LandingPage() {
                   <p className="font-orbitron text-sm font-bold text-[#f5f5f5] mb-1">Clone & install the desktop app</p>
                   <code className="block font-mono text-[12px] text-[#FF6B3D] bg-[#0a0000] border border-[rgba(160,21,21,0.2)] rounded px-3 py-2">{"git clone https://github.com/ajslockin-lab/jarvis-canvas.git"}</code>
                   <code className="block font-mono text-[12px] text-[#FF6B3D] bg-[#0a0000] border border-[rgba(160,21,21,0.2)] rounded px-3 py-2 mt-1">{"cd jarvis-canvas && pnpm install"}</code>
-                </div>
-              </div>
+               </div>
+             </div>
               <div className="flex gap-4">
                 <span className="font-mono-data text-lg font-bold text-[#FF4444]/30 shrink-0 w-6">2</span>
                 <div>
@@ -403,10 +361,10 @@ export default function LandingPage() {
                     <span className="text-[#FF6B3D]">Groq</span> API key (free tier available),
                     an <span className="text-[#FF6B3D]">encryption key</span> (any 64-char hex string),
                     and optionally <span className="text-[#FF6B3D]">ElevenLabs</span> for better voice.
-                  </p>
+                 </p>
                   <code className="block font-mono text-[12px] text-[#FF6B3D] bg-[#0a0000] border border-[rgba(160,21,21,0.2)] rounded px-3 py-2">{"cp .env.example .env  # then edit with your keys"}</code>
-                </div>
-              </div>
+               </div>
+             </div>
               <div className="flex gap-4">
                 <span className="font-mono-data text-lg font-bold text-[#FF4444]/30 shrink-0 w-6">3</span>
                 <div>
@@ -415,10 +373,10 @@ export default function LandingPage() {
                   <p className="font-rajdhani text-[12px] text-[rgba(245,245,245,0.3)] mt-2">
                     Then open <code className="text-[#FF6B3D]">http://localhost:20034</code> in Chrome.
                     The app auto-creates the database, pushes the schema, and builds the API on first run.
-                  </p>
-                </div>
-              </div>
-            </div>
+                 </p>
+               </div>
+             </div>
+           </div>
             <div className="mt-6 pt-4 border-t border-[rgba(160,21,21,0.15)] flex items-start gap-2">
               <Zap className="w-4 h-4 text-[#5a7a8a] mt-0.5 shrink-0" />
               <p className="font-rajdhani text-[12px] text-[rgba(245,245,245,0.4)] leading-relaxed">
@@ -430,40 +388,40 @@ export default function LandingPage() {
                   className="text-[#FF6B3D] underline underline-offset-2 hover:text-[#ff8a5c] transition"
                 >
                   the Carvis2 repo
-                </a>
+               </a>
                 {" "}which includes the Xcode project for the desktop overlay.
                 Requires macOS 13+ and Accessibility permissions for screen awareness.
                 All API keys stay local.
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
+             </p>
+           </div>
+         </div>
+       </div>
+     </section>
 
       <section className="py-24 px-6 text-center fade-in">
         <div className="max-w-2xl mx-auto">
-          <h2 className="text-4xl font-extrabold text-white mb-4">Ready to Stop Stressing?</h2>
+          <h2 className="text-4xl font-extrabold text-white mb-4">Ready to Stop Stressing</h2>
           <p className="text-slate-400 mb-10 leading-relaxed">
             Join students using CARVIS to stay on top of their coursework. Free to start, no credit card required.
-          </p>
+         </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Link href="/signin" className="inline-flex items-center justify-center gap-2 px-10 py-5 rounded-xl bg-white text-black font-semibold text-lg hover:bg-slate-200 transition shadow-lg shadow-white/10">
               Get Started Free <ArrowRight className="w-5 h-5" />
-            </Link>
+           </Link>
             <a href="#extension" className="inline-flex items-center justify-center gap-2 px-8 py-5 rounded-xl bg-white/5 text-white font-semibold text-lg border border-white/10 hover:bg-white/10 transition">
               <Puzzle className="w-5 h-5" /> Get Chrome Extension
-            </a>
-          </div>
-        </div>
-      </section>
+           </a>
+         </div>
+       </div>
+     </section>
 
       <footer className="border-t border-white/5 py-10 px-6 text-center">
         <div className="flex items-center justify-center gap-2 mb-4">
           <img src="/carvis-logo.png" alt="" className="h-6 w-6 object-contain" />
           <span className="text-sm font-bold text-slate-400">CARVIS Canvas Assistant</span>
-        </div>
-        <p className="text-xs text-slate-600">Your Canvas data is encrypted and never shared. CARVIS only reads — never modifies — your Canvas account.</p>
-      </footer>
-    </div>
+       </div>
+        <p className="text-xs text-slate-600">Your Canvas data is encrypted and never shared. CARVIS only reads — never modifies — your Canvas account</p>
+     </footer>
+   </div>
   );
 }

@@ -111,9 +111,15 @@ export function usePush(): UsePushResult {
     const reg = await navigator.serviceWorker.ready;
     let subscription = await reg.pushManager.getSubscription();
     if (!subscription) {
+      // Cast: TS 5.9's lib.dom.d.ts has narrowed Uint8Array to
+      // Uint8Array<ArrayBuffer>, but URL-safe base64 decoding returns
+      // Uint8Array<ArrayBufferLike>. The runtime value is a plain
+      // ArrayBuffer-backed view — the typing is over-restrictive for
+      // this specific DOM API. `applicationServerKey` accepts the broader
+      // form at runtime; the cast is a no-op at the binary level.
       subscription = await reg.pushManager.subscribe({
         userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(vapidPublicKey),
+        applicationServerKey: urlBase64ToUint8Array(vapidPublicKey) as BufferSource,
       });
     }
 
