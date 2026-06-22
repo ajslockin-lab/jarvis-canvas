@@ -1,5 +1,6 @@
 import { spawn } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
+import net from "node:net";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -105,6 +106,18 @@ async function shutdown(code = 0) {
 let embeddedPostgres;
 
 async function startEmbeddedPostgres() {
+  // embedded-postgres auto-detects the OS and downloads the right binary.
+  // On Windows it pulls @embedded-postgres/windows-x64, on Linux it pulls
+  // @embedded-postgres/linux-x64. Both are listed in pnpm-workspace.yaml's
+  // onlyBuiltDependencies so pnpm allows their native builds.
+  if (process.platform === "linux" && process.env.NODE_ENV === "production") {
+    console.error(
+      "embedded-postgres should not be used in production on Linux. " +
+      "Set DATABASE_URL to a managed Postgres instance instead.",
+    );
+    process.exit(1);
+  }
+
   const port = Number(process.env.POSTGRES_PORT ?? "54329");
   const password = process.env.POSTGRES_PASSWORD ?? "password";
   const database = process.env.POSTGRES_DB ?? "jarvis";
@@ -132,6 +145,62 @@ async function startEmbeddedPostgres() {
   } catch {
     // database may already exist from a previous run
   }
+
+  // Watchdog: @embedded-postgres/windows-x64 18.4.0-beta occasionally dies
+  // after a few connections (shared-memory release bug — the cluster process
+  // exits but no listener notifies us). We can't attach to the private
+  // pg child process, so instead poll the TCP port every 5s. If it's down
+  // and we're not shutting down, attempt to restart the cluster in place
+  // up to MAX_RESTARTS times before giving up.
+  //
+  // The grace period skips the first 30s of polling — postgres takes a few
+  // seconds to come up after start(), and we don't want a slow boot to
+  // trigger the restart logic before the cluster is even serving.
+  let restartCount = 0;
+  const MAX_RESTARTS = 3;
+  const GRACE_PERIOD_MS = 30_000;
+  const startedAt = Date.now();
+
+  const watchdog = setInterval(async () => {
+    if (shuttingDown) return;
+    if (Date.now() - startedAt < GRACE_PERIOD_MS) return;
+
+    const isUp = await new Promise((resolve) => {
+      const sock = net.createConnection({ host: "127.0.0.1", port }, () => {
+        sock.end();
+        resolve(true);
+      });
+      sock.on("error", () => resolve(false));
+      // Don't hang the watchdog if postgres is slow to refuse.
+      sock.setTimeout(1000, () => {
+        sock.destroy();
+        resolve(false);
+      });
+    });
+    if (isUp) return;
+
+    if (restartCount >= MAX_RESTARTS) {
+      console.error(
+        `[embedded-pg] postgres is down and hit the ${MAX_RESTARTS}-restart cap. ` +
+        `Stopping dev session. Run \`pnpm dev\` again to retry.`,
+      );
+      clearInterval(watchdog);
+      shutdown(1);
+      return;
+    }
+    restartCount++;
+    console.warn(
+      `[embedded-pg] postgres is not accepting connections; restarting (${restartCount}/${MAX_RESTARTS})...`,
+    );
+    try {
+      await embeddedPostgres.stop().catch(() => {});
+      await embeddedPostgres.start();
+      console.log("[embedded-pg] postgres is back up");
+    } catch (err) {
+      console.error("[embedded-pg] restart failed:", err);
+    }
+  }, 5000);
+  watchdog.unref();
 
   process.env.DATABASE_URL = `postgresql://postgres:${password}@127.0.0.1:${port}/${database}`;
   console.log(`DATABASE_URL set for embedded PostgreSQL (${database})`);
@@ -177,6 +246,14 @@ async function main() {
       DATABASE_URL: process.env.DATABASE_URL,
       ENCRYPTION_KEY: process.env.ENCRYPTION_KEY,
       GROQ_API_KEY: process.env.GROQ_API_KEY ?? "",
+      // Phase 4: forward email + push env. The loadEnvFile step above
+      // populates process.env from .env, but spawned children don't inherit
+      // by default — pass through everything that's relevant to the api.
+      RESEND_API_KEY: process.env.RESEND_API_KEY ?? "",
+      EMAIL_FROM: process.env.EMAIL_FROM ?? "",
+      VAPID_PUBLIC_KEY: process.env.VAPID_PUBLIC_KEY ?? "",
+      VAPID_PRIVATE_KEY: process.env.VAPID_PRIVATE_KEY ?? "",
+      VAPID_SUBJECT: process.env.VAPID_SUBJECT ?? "",
     },
   });
 
@@ -187,6 +264,9 @@ async function main() {
       PORT: webPort,
       BASE_PATH: basePath,
       NODE_ENV: "development",
+      // Phase 4: web app needs the VAPID public key bundled into the
+      // client. Vite reads VITE_-prefixed vars at build time.
+      VITE_VAPID_PUBLIC_KEY: process.env.VITE_VAPID_PUBLIC_KEY ?? "",
     },
   });
 
