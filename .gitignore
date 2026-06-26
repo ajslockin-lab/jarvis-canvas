@@ -53,9 +53,15 @@ replit.md
 
 # Local environment
 .env
+.env.production
+.env.development
 .pgdata/
 .carvis-ref/
 .migration-backup/
+
+# API server env files for managed deployment secrets.
+artifacts/api-server/.env.production
+artifacts/api-server/.env.development
 
 # Dev command file with hardcoded local secrets — keep off the public repo.
 scripts/start-api.cmd
