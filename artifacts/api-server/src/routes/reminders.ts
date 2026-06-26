@@ -2,7 +2,7 @@ import { Router } from "express";
 import { randomBytes } from "crypto";
 import { db } from "@workspace/db";
 import { remindersTable, assignmentsTable } from "@workspace/db/schema";
-import { eq, and, lte, gte } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { requireAuth } from "../lib/auth.js";
 import { sendPushToUser } from "../lib/webpush.js";
 import { z } from "zod";
@@ -88,6 +88,13 @@ router.post("/reminders", async (req, res) => {
         type,
         triggeredAt: new Date(triggeredAt),
         active: true,
+        // Phase 1: persist the display fields the scheduler reads to compose a
+        // push notification. Push-body enrichment still happens below so the
+        // /reminders GET response stays useful when the assignment lookup
+        // hasn't run or the user just wants to inspect the row.
+        title: pushTitle,
+        body: pushBody,
+        url: pushUrl ?? null,
       })
       .returning();
 
@@ -141,34 +148,6 @@ router.patch("/reminders", async (req, res) => {
   } catch (err) {
     console.error("Update reminder error:", err);
     res.status(500).json({ error: "Failed to update reminders" });
-  }
-});
-
-// GET /api/reminders/due — list reminders due in the next 5 minutes for
-// the current user. Used by future scheduler work — kept simple here so
-// the route can be polled cheaply without re-querying everything.
-router.get("/reminders/due", async (req, res) => {
-  const user = await requireAuth(req, res);
-  if (!user) return;
-
-  try {
-    const now = new Date();
-    const horizon = new Date(now.getTime() + 5 * 60_000);
-    const due = await db
-      .select()
-      .from(remindersTable)
-      .where(
-        and(
-          eq(remindersTable.userId, user.id),
-          eq(remindersTable.active, true),
-          gte(remindersTable.triggeredAt, now),
-          lte(remindersTable.triggeredAt, horizon),
-        ),
-      );
-    res.json(due);
-  } catch (err) {
-    console.error("List due reminders error:", err);
-    res.status(500).json({ error: "Failed to fetch due reminders" });
   }
 });
 

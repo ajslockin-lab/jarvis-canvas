@@ -11,8 +11,9 @@
 // implicitly via credentials: "include" on subsequent requests.
 
 import { useState, useEffect } from "react";
-import { ArrowRight, Loader2, Shield, AlertCircle, Eye, EyeOff } from "lucide-react";
+import { ArrowRight, Loader2, Shield, AlertCircle, Eye, EyeOff, Users } from "lucide-react";
 import { Link, useLocation } from "wouter";
+import { pushRecentAccount, readRecentAccounts, removeRecentAccount, type RecentAccount } from "@/lib/recent-accounts";
 
 // Match the server's ErrorCodes enum in routes/auth.ts. Frontend uses these
 // to pick the right user-facing copy.
@@ -30,7 +31,18 @@ export default function SignInPage() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<SignInError | null>(null);
-  const [stage, setStage] = useState<"idle" | "signing_in">("idle");
+  const [stage, setStage] = useState<"idle" | "signing_in" | "switching">("idle");
+  const [recentAccounts, setRecentAccounts] = useState<RecentAccount[]>([]);
+  // When the user clicks "Use a different account" we hide the tab row and
+  // force them onto the email/password form. Reset to false on a successful
+  // signin or switch.
+  const [useDifferentAccount, setUseDifferentAccount] = useState(false);
+
+  // Load recent accounts from localStorage on first render. localStorage is
+  // browser-only so this has to be in an effect (not at module top level).
+  useEffect(() => {
+    setRecentAccounts(readRecentAccounts());
+  }, []);
 
   // If the user is already signed in, /signin is a dead-end — push them to
   // the dashboard immediately. Cheap 200 check via /api/user/data; 401 means
@@ -89,6 +101,18 @@ export default function SignInPage() {
 
       if (res.ok) {
         const data = await res.json();
+        // Mirror the session to localStorage so the switch-account tab on
+        // /signin can use it later. The cookie is the source of truth for
+        // the current tab — localStorage is just for the *next* signin.
+        if (data.user && data.sessionToken) {
+          pushRecentAccount({
+            userId: data.user.id,
+            email: data.user.email,
+            name: data.user.name ?? data.user.email,
+            sessionToken: data.sessionToken,
+            lastSeenAt: Date.now(),
+          });
+        }
         // The session cookie set by the server is the source of truth. We
         // deliberately do NOT mirror data.sessionToken to localStorage here
         // — see ExtensionOverlay.tsx for the one exception.
@@ -126,7 +150,50 @@ export default function SignInPage() {
     }
   };
 
-  const stageLabel = stage === "idle" ? "SIGN IN" : "SIGNING IN…";
+  // One-tap sign-in for a previously-signed-in account. The server validates
+  // the localStorage sessionToken, and on success re-issues the cookie so the
+  // dashboard's next request is authenticated. We refresh the tab's
+  // lastSeenAt so it sorts to the front of the list.
+  const handleSwitchAccount = async (account: RecentAccount) => {
+    if (stage !== "idle") return;
+    setError(null);
+    setStage("switching");
+    try {
+      const res = await fetch("/api/auth/switch-account", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ userId: account.userId, sessionToken: account.sessionToken }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const refreshed: RecentAccount = {
+          userId: account.userId,
+          email: account.email,
+          name: account.name,
+          sessionToken: data.sessionToken ?? account.sessionToken,
+          lastSeenAt: Date.now(),
+        };
+        pushRecentAccount(refreshed);
+        setRecentAccounts(readRecentAccounts());
+        navigate("/dashboard", { replace: true });
+        return;
+      }
+      // The session on this device is gone (expired, or the user was
+      // hard-deleted). Drop the tab so the next render doesn't keep showing
+      // a dead button, and tell the user why.
+      removeRecentAccount(account.userId);
+      setRecentAccounts(readRecentAccounts());
+      setError({ kind: "bad_request", message: "That account is no longer signed in on this device — sign in with your password." });
+    } catch {
+      setError({ kind: "network" });
+    } finally {
+      setStage("idle");
+    }
+  };
+
+  const showTabs = recentAccounts.length > 0 && !useDifferentAccount;
+  const stageLabel = stage === "idle" ? "SIGN IN" : stage === "switching" ? "SWITCHING…" : "SIGNING IN…";
 
   return (
     <div className="hud-bg min-h-screen text-[#f5f5f5] font-sans flex items-center justify-center px-6 py-12">
@@ -139,6 +206,18 @@ export default function SignInPage() {
 
         <div className="hud-panel p-8">
           <span className="corner-br" />
+
+          {showTabs && (
+            <RecentAccountTabs
+              accounts={recentAccounts}
+              busy={stage === "switching"}
+              onSwitch={handleSwitchAccount}
+              onUseDifferent={() => {
+                setUseDifferentAccount(true);
+                setError(null);
+              }}
+            />
+          )}
 
           <div className="text-center mb-6">
             <h1 className="font-orbitron text-lg font-bold tracking-[0.15em] text-[#FF4444] mb-2">WELCOME BACK</h1>
@@ -210,6 +289,15 @@ export default function SignInPage() {
                 Create account →
               </Link>
             </div>
+            {useDifferentAccount && recentAccounts.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setUseDifferentAccount(false)}
+                className="w-full font-rajdhani text-[11px] text-[rgba(245,245,245,0.4)] hover:text-[#FF4444] transition mt-2 inline-flex items-center justify-center gap-1"
+              >
+                <Users className="w-3 h-3" /> Use a saved account
+              </button>
+            )}
           </div>
 
           <div className="flex items-start gap-2 mt-6 pt-4 border-t border-[rgba(160,21,21,0.15)]">
@@ -297,6 +385,62 @@ function ErrorBlock({ error, onRetry }: { error: SignInError; onRetry: () => voi
         <button onClick={onRetry} className="font-orbitron text-[10px] tracking-[0.1em] text-[#FF4444] mt-2 inline-flex items-center gap-1 hover:underline">
           RETRY
         </button>
+      </div>
+    </div>
+  );
+}
+
+// RecentAccountTabs — row of clickable account tabs above the form.
+// Shows up to 3 previously-signed-in accounts. Clicking one signs the user
+// straight back in (no password re-entry). The "Use a different account"
+// link collapses the tab row and shows the email/password form.
+function RecentAccountTabs({
+  accounts,
+  busy,
+  onSwitch,
+  onUseDifferent,
+}: {
+  accounts: RecentAccount[];
+  busy: boolean;
+  onSwitch: (a: RecentAccount) => void;
+  onUseDifferent: () => void;
+}) {
+  return (
+    <div className="mb-6 -mx-2">
+      <div className="flex items-center justify-between mb-3 px-2">
+        <span className="font-orbitron text-[10px] font-bold tracking-[0.2em] text-[rgba(245,245,245,0.4)]">SAVED ACCOUNTS</span>
+        <button
+          type="button"
+          onClick={onUseDifferent}
+          className="font-rajdhani text-[11px] text-[rgba(245,245,245,0.4)] hover:text-[#FF4444] transition"
+        >
+          Use a different account
+        </button>
+      </div>
+      <div className="flex gap-2 overflow-x-auto px-2 pb-1">
+        {accounts.map((a) => (
+          <button
+            key={a.userId}
+            type="button"
+            disabled={busy}
+            onClick={() => onSwitch(a)}
+            className="group flex-1 min-w-[110px] flex flex-col items-center gap-2 p-3 rounded-lg border border-[rgba(160,21,21,0.25)] bg-[#0a0000] hover:border-[#FF4444]/60 hover:bg-[#FF4444]/5 transition disabled:opacity-50"
+            aria-label={`Sign in as ${a.name}`}
+          >
+            <div className="w-10 h-10 rounded-full border border-[#FF4444]/40 bg-[#FF4444]/10 flex items-center justify-center font-orbitron text-sm font-bold text-[#FF4444]">
+              {a.name.trim().charAt(0).toUpperCase() || "?"}
+            </div>
+            <div className="text-center w-full overflow-hidden">
+              <p className="font-rajdhani text-[12px] text-[#f5f5f5] truncate" title={a.name}>{a.name}</p>
+              <p className="font-mono-data text-[10px] text-[rgba(245,245,245,0.4)] truncate" title={a.email}>{a.email}</p>
+            </div>
+          </button>
+        ))}
+      </div>
+      <div className="flex items-center gap-3 mt-4 px-2">
+        <div className="flex-1 h-px bg-[rgba(160,21,21,0.15)]" />
+        <span className="font-orbitron text-[9px] tracking-[0.2em] text-[rgba(245,245,245,0.3)]">OR SIGN IN WITH PASSWORD</span>
+        <div className="flex-1 h-px bg-[rgba(160,21,21,0.15)]" />
       </div>
     </div>
   );

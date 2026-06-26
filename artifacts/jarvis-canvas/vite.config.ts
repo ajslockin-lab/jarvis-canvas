@@ -106,6 +106,12 @@ export default defineConfig({
   build: {
     outDir: path.resolve(import.meta.dirname, "dist/public"),
     emptyOutDir: true,
+    // External .js.map sidecars for every chunk. The browser fetches them
+    // only when DevTools is open, so prod users pay nothing; we get
+    // readable stack traces when they do open it. Vite already emits
+    // content-hashed filenames for the assets themselves, so this is the
+    // remaining production-readiness gap ("why is my prod stack opaque?").
+    sourcemap: true,
   },
   server: {
     port,

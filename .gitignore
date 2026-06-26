@@ -57,5 +57,19 @@ replit.md
 .carvis-ref/
 .migration-backup/
 
+# Dev command file with hardcoded local secrets — keep off the public repo.
+scripts/start-api.cmd
+
+# Runtime logs — debugging output. May contain session tokens in stderr.
+*.log
+*.err
+*.err.log
+startup.*
+dev.log
+
+# Probe fixtures — request bodies with real user PII (emails/OTPs).
+scripts/probe-*.json
+scripts/*-body.json
+
 # Vite PWA dev output
 dev-dist/

@@ -48,6 +48,18 @@ describe("OAuth callback SSRF guard", () => {
     }
   });
 
+  it("accepts URLs with a trailing slash (browser address bar paste)", async () => {
+    const urlsWithSlash = [
+      "https://school.instructure.com/",
+      "https://canvas.gatech.edu/",
+      "https://school.instructure.com///",
+      "  https://school.instructure.com/  ",
+    ];
+    for (const url of urlsWithSlash) {
+      expect(VALIDATE_CANVAS_URL(url)).toBe(true);
+    }
+  });
+
   it("validates OAuth state parameter matching", async () => {
     const state: string = "abc123";
     const storedState: string = "abc123";

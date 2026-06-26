@@ -44,6 +44,10 @@ router.get("/user/data", async (req, res) => {
         email: user.email,
         name: user.name,
         canvasBaseUrl: user.canvasBaseUrl,
+        // Frontend uses this to decide whether the delete-account dialog
+        // needs a password re-prompt (password/both) or can rely on the
+        // session cookie alone (canvas-only). Never returns passwordHash.
+        authProvider: user.authProvider,
       },
       courses: coursesWithAssignments,
       hasData: coursesWithAssignments.length > 0,

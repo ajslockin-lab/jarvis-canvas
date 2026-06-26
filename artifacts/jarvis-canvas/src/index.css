@@ -6,10 +6,10 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-lato);
+  --font-sans: var(--font-jetbrains);
   --font-mono: var(--font-jetbrains);
-  --font-heading: var(--font-lato);
-  --font-body: var(--font-lato);
+  --font-heading: var(--font-orbitron);
+  --font-body: var(--font-jetbrains);
 }
 
 :root {
@@ -32,11 +32,14 @@
   --input: rgba(160, 21, 21, 0.2);
   --ring: #ff4444;
   --radius: 0.5rem;
+  /* Typography stack — fonts are loaded via <link> in index.html. Order
+     matters: face first, then a system fall-back if Google Fonts is blocked. */
+  --font-orbitron: "Orbitron", "Lato", -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-jetbrains: "JetBrains Mono", "Cascadia Mono", "Consolas", ui-monospace, monospace;
   --font-lato: "Lato", -apple-system, BlinkMacSystemFont, sans-serif;
-  --font-jetbrains: "Cascadia Mono", "Consolas", monospace;
   --carvis-red: #ff4444;
   --carvis-red-dim: #a01515;
-  --carvis-red-glow: #ff1e1e;
+  --carvis-red-glow: #dc2626;
   --carvis-orange: #ff6b3d;
 }
 
@@ -103,6 +106,13 @@
 @media (prefers-reduced-motion: reduce) {
   .hud-scanline::after { animation: none; }
   .hud-bg::before { background-image: none; }
+  /* HUD sync spin (Mic button while listening) was missing from the
+     reduced-motion guard above — without it, the icon would still rotate
+     on machines flagged with the OS-level motion preference. */
+  .hud-sync-active { animation: none; }
+  /* Listening-ring pulse on the voice modal — also respects reduced-motion.
+     Keeps the soft glow but stops the breath cycle. */
+  .carvis-voice.is-listening::before { animation: none; }
 }
 
 .hud-panel {
@@ -293,9 +303,8 @@
   transition: color 0.2s ease;
 }
 
-.font-orbitron { font-family: var(--font-lato), system-ui, sans-serif; font-weight: 700; letter-spacing: 0.12em; }
-.font-rajdhani { font-family: var(--font-lato), system-ui, sans-serif; }
-.font-mono-data { font-family: var(--font-jetbrains), monospace; }
+.font-orbitron { font-family: var(--font-orbitron); font-weight: 700; letter-spacing: 0.12em; }
+.font-mono-data { font-family: var(--font-jetbrains); font-weight: 400; }
 
 @keyframes arc-pulse {
   0%, 100% { box-shadow: 0 0 20px rgba(255, 68, 68, 0.15), inset 0 0 20px rgba(255, 30, 30, 0.05); }
@@ -337,7 +346,23 @@
 /* ========== CARVIS VOICE INTERFACE ========== */
 
 .carvis-voice {
-  font-family: var(--font-lato), sans-serif;
+  position: relative;
+}
+
+/* Corner brackets — four 32px L-marks. Two box-shadow inset shadows per axis
+   per corner: one horizontal arm + one vertical arm per corner. Reads as the
+   canonical HUD bracket without eight stacked gradients. */
+.carvis-voice::after {
+  content: "";
+  position: absolute;
+  inset: 24px;
+  pointer-events: none;
+  z-index: 5;
+  box-shadow:
+    inset  32px   0   0 -31px rgba(255, 68, 68, 0.45),
+    inset   0   32px  0 -31px rgba(255, 68, 68, 0.45),
+    inset -32px   0   0 -31px rgba(255, 68, 68, 0.45),
+    inset   0  -32px  0 -31px rgba(255, 68, 68, 0.45);
 }
 
 .carvis-control-btn {
@@ -368,25 +393,105 @@
 
 .carvis-status {
   color: rgba(255, 68, 68, 0.55);
-  font-size: 13px;
+  font-family: var(--font-jetbrains);
+  font-size: 12px;
   letter-spacing: 2px;
   text-transform: lowercase;
-  font-weight: 300;
+  font-weight: 400;
   transition: opacity 0.5s ease;
 }
 
 .carvis-label {
-  color: rgba(160, 21, 21, 0.4);
-  font-size: 10px;
-  letter-spacing: 5px;
+  /* Bigger and dimmer than before — was 10px / 5px tracking, both felt
+     anemic. Now 12px / 9px with a subtle gradient and a tiny glow that
+     matches the brand palette without screaming. */
+  font-family: var(--font-orbitron);
+  font-size: 12px;
+  letter-spacing: 9px;
   text-transform: uppercase;
   font-weight: 700;
+  background: linear-gradient(90deg, rgba(255, 30, 30, 0.55), rgba(255, 68, 68, 0.4));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  text-shadow: 0 0 12px rgba(255, 30, 30, 0.25);
+  pointer-events: none;
 }
 
 .carvis-transcript {
   color: rgba(245, 245, 245, 0.55);
   letter-spacing: 0.3px;
   font-weight: 300;
+}
+
+/* ---------------------------------------------------------------------------
+   Voice modal state classes — toggled via className on the root .carvis-voice
+   div. Using state classes (instead of conditional elements) keeps the
+   modal's React tree stable and lets CSS own the visual transitions.
+   --------------------------------------------------------------------------- */
+
+/* Press-and-hold listening affordance — a soft red glow lerps in around the
+   viewport centre while the user holds the mic button. Pure CSS so we don't
+   add React re-renders on every pointer event. */
+.carvis-voice::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 5;
+  opacity: 0;
+  transition: opacity 0.25s ease;
+  background: radial-gradient(circle at 50% 50%, rgba(255, 68, 68, 0.18), transparent 28%);
+}
+.carvis-voice.is-listening::before {
+  opacity: 1;
+  animation: voice-ring-pulse 1.6s ease-in-out infinite;
+}
+@keyframes voice-ring-pulse {
+  0%, 100% {
+    background: radial-gradient(circle at 50% 50%, rgba(255, 68, 68, 0.18), transparent 28%);
+  }
+  50% {
+    background: radial-gradient(circle at 50% 50%, rgba(255, 68, 68, 0.32), transparent 36%);
+  }
+}
+
+/* Loading spinner — always rendered in the tree but hidden until the parent
+   gets .is-loading. Switching the parent's className is a single attr write;
+   no React unmount. */
+.carvis-loading-spinner { display: none; }
+.carvis-voice.is-loading .carvis-loading-spinner { display: inline-block; }
+
+/* First-time empty-state hint chip — floats just above the input pill and
+   fades in until the user submits their first question. The chip text is
+   always rendered in the DOM (good for screen readers, even when hidden) but
+   CSS controls visibility. */
+.carvis-empty-hint {
+  position: absolute;
+  left: 50%;
+  bottom: 32px;
+  transform: translateX(-50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: rgba(255, 30, 30, 0.06);
+  border: 1px solid rgba(160, 21, 21, 0.2);
+  color: rgba(255, 68, 68, 0.7);
+  font-family: var(--font-jetbrains);
+  font-size: 11px;
+  letter-spacing: 0.5px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.4s ease;
+}
+.carvis-voice.first-time .carvis-empty-hint {
+  opacity: 0.85;
+}
+.carvis-voice.is-loading .carvis-empty-hint,
+.carvis-voice.has-response .carvis-empty-hint {
+  opacity: 0;
 }
 
 .carvis-response {

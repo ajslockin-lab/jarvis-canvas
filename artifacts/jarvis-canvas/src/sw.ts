@@ -22,6 +22,14 @@
 // casts to satisfy tsc without pulling in a second tsconfig just for this
 // file.
 
+// workbox-build, used by vite-plugin-pwa's injectManifest strategy, looks for
+// this exact identifier on `self` and replaces the RHS with its precache
+// manifest at build time. We don't precache anything (globPatterns: [], see
+// vite.config.ts), so the array stays empty — the assignment is required
+// only so the build doesn't bail with "unable to find a place to inject
+// the manifest". Without this the production frontend build fails.
+(self as unknown as { __WB_MANIFEST: unknown[] }).__WB_MANIFEST = [];
+
 // `self` is typed as `Window & typeof globalThis` by the dom lib, but at
 // runtime in a service worker it IS a ServiceWorkerGlobalScope. Cast
 // through `unknown` to bridge the type gap without `// @ts-expect-error`.

@@ -1,0 +1,63 @@
+# Render Blueprint — deploys the Carvis API server.
+#
+# Prerequisites:
+#   1. Create a managed Postgres database on Render first, then link it
+#      via the DATABASE_URL env var below.
+#   2. Set the secrets in the Render dashboard (sync: false entries below):
+#        ENCRYPTION_KEY, RESEND_API_KEY, ALLOWED_ORIGINS, GROQ_API_KEY,
+#        APP_URL, EMAIL_FROM, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY,
+#        VAPID_SUBJECT, CANVAS_CLIENT_ID, CANVAS_CLIENT_SECRET
+#      EMAIL_FROM must be a sender on a domain you've verified in Resend
+#      (e.g. "Carvis <noreply@carvis.app>" once carvis.app is verified).
+#   3. Verify your sending domain in Resend before turning on prod signups
+#      — unverified senders bounce.
+#
+# The frontend (jarvis-canvas) can be deployed separately on Vercel or as a
+# static site on Render — just point VITE_API_URL to this API service.
+
+services:
+  - type: web
+    name: carvis-api
+    runtime: node
+    plan: starter
+    buildCommand: pnpm install --frozen-lockfile && pnpm --filter @workspace/api-server run build
+    startCommand: node artifacts/api-server/dist/index.mjs
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        renderGroup: env
+      - key: DATABASE_URL
+        fromDatabase:
+          name: carvis-db
+          property: connectionString
+      - key: ENCRYPTION_KEY
+        sync: false
+      - key: RESEND_API_KEY
+        sync: false
+      - key: ALLOWED_ORIGINS
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      - key: APP_URL
+        sync: false
+      - key: EMAIL_FROM
+        sync: false
+      - key: VAPID_PUBLIC_KEY
+        sync: false
+      - key: VAPID_PRIVATE_KEY
+        sync: false
+      - key: VAPID_SUBJECT
+        sync: false
+      - key: CANVAS_CLIENT_ID
+        sync: false
+      - key: CANVAS_CLIENT_SECRET
+        sync: false
+      - key: REMINDER_SCHEDULER_ENABLED
+        value: "true"
+      - key: CANVAS_SYNC_ENABLED
+        value: "true"
+
+databases:
+  - name: carvis-db
+    plan: starter

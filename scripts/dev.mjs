@@ -228,6 +228,33 @@ async function main() {
     env: { DATABASE_URL: process.env.DATABASE_URL },
   });
 
+  // Security hardening (extensions, audit triggers, non-superuser role).
+  // Runs after the schema push so 0005_security_hardening.sql has tables to
+  // attach triggers onto. Idempotent — safe to re-run every dev cycle.
+  console.log("Applying security hardening...");
+  await run("node", ["../lib/db/scripts/apply-security-hardening.mjs"], {
+    cwd: path.join(root, "scripts"),
+    env: { DATABASE_URL: process.env.DATABASE_URL },
+  });
+
+  // Calendar index migration (0006_calendar_events.sql). Only the SQL-level
+  // side of the calendar phase lands here — the table itself is created by
+  // drizzle-kit push above. Idempotent CREATE INDEX IF NOT EXISTS.
+  console.log("Applying calendar indexes...");
+  await run("node", ["../lib/db/scripts/apply-calendar-indexes.mjs"], {
+    cwd: path.join(root, "scripts"),
+    env: { DATABASE_URL: process.env.DATABASE_URL },
+  });
+
+  // Phase 4 — notes table + reverse-chron index. Same pattern as the
+  // hardening/calendar scripts: raw SQL for indexes drizzle-kit push
+  // can't express; dev.mjs reapplies idempotently each cycle.
+  console.log("Applying notes schema...");
+  await run("node", ["../lib/db/scripts/apply-notes-table.mjs"], {
+    cwd: path.join(root, "scripts"),
+    env: { DATABASE_URL: process.env.DATABASE_URL },
+  });
+
   console.log("Building API server...");
   await run("pnpm", ["--filter", "@workspace/api-server", "run", "build"]);
 

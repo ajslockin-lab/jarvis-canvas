@@ -25,6 +25,25 @@
     <meta name="apple-mobile-web-app-title" content="Carvis" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="application-name" content="Carvis" />
+    <!--
+      Content-Security-Policy via meta tag.
+      Production builds (Vite) emit no inline scripts and use ESM, so the
+      'self' baseline is sufficient. We keep 'unsafe-inline' / 'unsafe-eval'
+      in script-src and ws: in connect-src so `pnpm dev` (Vite HMR) keeps
+      working — tighten these in production by setting the CSP header at
+      the hosting layer (Render / Vercel). This meta tag is the fallback
+      for static hosts that don't honor custom response headers.
+
+      frame-ancestors blocks click-jacking; base-uri 'self' neutralises
+      <base href> injection; form-action 'self' prevents off-site form
+      posts. api.carvis.app is the standard a CNAME in front of
+      the Render web service; if the prod host differs, update
+      connect-src or rely on the host header instead.
+    -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' ws: wss: https://carvis.app https://*.carvis.app; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+    />
 
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link
@@ -56,8 +75,16 @@
     />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <!--
+      CARVIS typography stack (HUD aesthetic):
+      - Orbitron: wordmark, headings, section labels     (geometric, futuristic)
+      - Rajdhani:  body copy, descriptions, settings      (slim, slightly technical)
+      - JetBrains Mono: data readouts, code, status       (developer-mono)
+      - Lato: fallback for any legacy/uncopied text       (kept for compatibility)
+      Single CSS2 request keeps payload tight; weights picked so no FOUT flicker.
+    -->
     <link
-      href="https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=JetBrains+Mono:wght@400;500&display=swap"
       rel="stylesheet"
     />
   </head>

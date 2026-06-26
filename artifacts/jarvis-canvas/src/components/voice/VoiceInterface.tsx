@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Volume2, VolumeX, X, Mic, Send } from "lucide-react";
+import { Volume2, VolumeX, X, Mic, Send, Loader2 } from "lucide-react";
 import CarvisOrb from "./CarvisOrb";
 import type { OrbState } from "@/lib/carvisOrb";
 
@@ -98,10 +98,26 @@ export default function VoiceInterface({
   // from defaultQuery when the modal opens (e.g. from a FirstRunNudge chip).
   const [textInput, setTextInput] = useState<string>(defaultQuery ?? "");
   const [hasSubmittedOnce, setHasSubmittedOnce] = useState(false);
+  // Mobile flag — set on mount via media query and used to suppress
+  // autoFocus so the soft keyboard doesn't pop the moment the orb opens.
+  const [isMobile, setIsMobile] = useState(false);
+  // Audio analyser for the orb's audio-reactive branch (bass/mid feeding
+  // outward push + sine pulse). Set lazily on the first user gesture in
+  // startListening(), not on mount, because an AudioContext created outside
+  // a user gesture is blocked by autoplay policy and will run in a suspended
+  // state forever. Null = orb runs without audio reactivity (still renders,
+  // just no bass/mid flow).
+  const [analyser, setAnalyser] = useState<AnalyserNode | null>(null);
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
   const finalTranscriptRef = useRef("");
   const displayTranscriptRef = useRef("");
   const shouldSubmitRef = useRef(false);
+  // Long-lived mic stream + AudioContext refs. Kept across remounts so we
+  // only prompt for mic permission once per session even if the user closes
+  // and reopens the modal. Released in the cleanup effect on full unmount.
+  const audioStreamRef = useRef<MediaStream | null>(null);
+  const audioCtxRef = useRef<AudioContext | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
 
   // Hydrate the text input whenever the modal opens with a fresh defaultQuery.
   // Without this, reopening the modal would show a stale value.
@@ -110,6 +126,113 @@ export default function VoiceInterface({
       setTextInput(defaultQuery ?? "");
     }
   }, [isOpen, defaultQuery]);
+
+  // Esc-to-close. Skipped while the text input is focused AND something is
+  // being typed — autoFocus on desktop would otherwise yank the keyboard
+  // away mid-word. We only close when the input is empty or blurred.
+  useEffect(() => {
+    if (!isOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      const tag = (e.target as HTMLElement | null)?.tagName;
+      const isTypingInField =
+        tag === "INPUT" || tag === "TEXTAREA";
+      const inputHasContent = (document.activeElement as HTMLInputElement | null)?.value?.length;
+      // Only swallow Escape when nothing is being typed — otherwise respect
+      // native input-escape behavior (which clears some mobile keyboards).
+      if (!isTypingInField || !inputHasContent) {
+        e.preventDefault();
+        onClose();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [isOpen, onClose]);
+
+  // Detect mobile so we can avoid autoFocus (mobile keyboards pop open
+  // immediately on focus and ruin the cinematic-orb first impression).
+  // On desktop we keep autoFocus so power-users land cursor-in-input.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    setIsMobile(window.matchMedia("(max-width: 640px)").matches);
+  }, []);
+
+  // Release the mic + AudioContext on full unmount. The modal opens/closes
+  // via the isOpen prop without unmounting, so the stream outlives a single
+  // session and we only revoke on actual destruction. Tracks.stop() is the
+  // canonical way to release the OS-level mic so the browser's permission
+  // indicator turns off. Safe to call repeatedly — guards on null.
+  useEffect(() => {
+    return () => {
+      const stream = audioStreamRef.current;
+      if (stream) {
+        stream.getTracks().forEach((track) => track.stop());
+        audioStreamRef.current = null;
+      }
+      const node = analyserRef.current;
+      if (node) {
+        try { node.disconnect(); } catch { /* already disconnected */ }
+        analyserRef.current = null;
+      }
+      const ctx = audioCtxRef.current;
+      if (ctx && ctx.state !== "closed") {
+        void ctx.close().catch(() => undefined);
+        audioCtxRef.current = null;
+      }
+      setAnalyser(null);
+    };
+  }, []);
+
+  // Lazy audio-context acquisition. Mirrors the gesture-based constraint
+  // Chrome imposes: AudioContext must be created (or resumed) inside a user
+  // gesture, otherwise it stays in `suspended` state and getByteFrequencyData
+  // returns all-zero arrays forever. Called from startListening() — pointer
+  // down counts as a gesture. Idempotent: returns the cached node if we
+  // already have one.
+  const ensureAnalyser = useCallback(async (): Promise<AnalyserNode | null> => {
+    if (analyserRef.current) return analyserRef.current;
+    if (typeof navigator === "undefined") return null;
+    if (!navigator.mediaDevices?.getUserMedia) return null;
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          // Disable processing the SpeechRecognition engine already handles
+          // so we don't double-apply the noise gate and distort the FFT.
+          echoCancellation: false,
+          noiseSuppression: false,
+          autoGainControl: false,
+        },
+      });
+      audioStreamRef.current = stream;
+      // Use webkit-prefixed constructor for Safari.
+      const AudioCtor: typeof AudioContext =
+        window.AudioContext ||
+        (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext!;
+      if (!AudioCtor) return null;
+      const ctx = new AudioCtor();
+      audioCtxRef.current = ctx;
+      // Safari ships AudioContext in `suspended` state until a user gesture
+      // resumes it; Chrome starts `running` since we created it inside one.
+      // resume() is idempotent and safe to call regardless of state.
+      if (ctx.state === "suspended") void ctx.resume().catch(() => undefined);
+      const source = ctx.createMediaStreamSource(stream);
+      const node = ctx.createAnalyser();
+      // Small FFT keeps the cost down — 64 bins matches the orb's existing
+      // bass/mid split (bins 0-7 bass, 8-23 mid).
+      node.fftSize = 128;
+      node.smoothingTimeConstant = 0.6;
+      source.connect(node);
+      // Deliberately NOT connecting node -> ctx.destination: no echo. The
+      // analyser reads samples without routing them to speakers.
+      analyserRef.current = node;
+      setAnalyser(node);
+      return node;
+    } catch {
+      // Permission denied, no mic, or the gesture was rejected — fall back
+      // to no analyser so the orb still renders (just without audio react).
+      return null;
+    }
+  }, []);
 
   const speak = useCallback((text: string) => {
     if (!("speechSynthesis" in window)) return;
@@ -220,6 +343,10 @@ export default function VoiceInterface({
   const startListening = () => {
     if (!recognitionRef.current || isLoading || isListening || !speechSupported) return;
     stopTts();
+    // Fire-and-forget: we want the orb to react to the mic as soon as the
+    // user holds the button. Errors here are non-fatal (try/catch is inside
+    // ensureAnalyser) and the SpeechRecognition path still works without it.
+    void ensureAnalyser();
     finalTranscriptRef.current = "";
     displayTranscriptRef.current = "";
     shouldSubmitRef.current = false;
@@ -258,8 +385,12 @@ export default function VoiceInterface({
   const voiceButtonEnabled = voiceModeEnabled && speechSupported;
 
   return (
-    <div className="carvis-voice fixed inset-0 z-50 overflow-hidden bg-black">
-      <CarvisOrb state={orbState} />
+    <div
+      className={`carvis-voice fixed inset-0 z-50 overflow-hidden ${
+        isListening ? "is-listening " : ""
+      }${isLoading ? "is-loading " : ""}${!hasSubmittedOnce ? "first-time " : ""}`}
+    >
+      <CarvisOrb state={orbState} analyser={analyser} />
 
       <img
         src="/carvis-logo.png"
@@ -299,6 +430,10 @@ export default function VoiceInterface({
           type="button"
           className="absolute inset-0 z-10 touch-none"
           aria-label="Press and hold to speak"
+          // tabIndex=-1 keeps the full-screen capture layer out of the tab
+          // order — otherwise Tab gets trapped on this invisible button and
+          // users can never reach the close or text-input controls.
+          tabIndex={-1}
           onPointerDown={startListening}
           onPointerUp={stopListening}
           onPointerCancel={stopListening}
@@ -310,10 +445,10 @@ export default function VoiceInterface({
       {(transcript || response) && (
         <div className="pointer-events-none absolute left-1/2 top-16 z-20 w-full max-w-lg -translate-x-1/2 px-6">
           {transcript && (
-            <p className="carvis-transcript mb-2 text-center text-sm">{transcript}</p>
+            <p className="carvis-transcript mb-2 text-center text-sm" aria-live="polite" aria-atomic="true">{transcript}</p>
           )}
           {response && (
-            <p className="carvis-response text-center text-sm">{response}</p>
+            <p className="carvis-response text-center text-sm" aria-live="polite" aria-atomic="true">{response}</p>
           )}
         </div>
       )}
@@ -350,26 +485,38 @@ export default function VoiceInterface({
                 : "what's due this week?"
             }
             disabled={isLoading}
-            autoFocus
+            autoFocus={!isMobile}
             className="flex-1 bg-transparent border-none outline-none text-[#f5f5f5] font-rajdhani text-sm placeholder:text-[rgba(245,245,245,0.35)]"
           />
           <button
             type="submit"
-            disabled={isLoading || !textInput.trim()}
+            hidden={isLoading}
+            disabled={!textInput.trim()}
             className="text-[#FF4444] hover:text-[#FF6B3D] disabled:opacity-30 disabled:cursor-not-allowed transition shrink-0"
             aria-label="Send question"
           >
             <Send className="w-4 h-4" />
-          </button>
-        </div>
-      </form>
+         </button>
+          {/* Loader2 lives OUTSIDE the submit button on purpose — the button has
+              hidden={isLoading} which renders as display:none, which would
+              also hide any descendant. As a sibling it can show. CSS handles
+              toggling it: default display:none; .is-loading on the parent
+              root promotes it to display:inline-block. */}
+          <Loader2
+            className="carvis-loading-spinner w-4 h-4 text-[#FF6B3D] animate-spin"
+            aria-label="Waiting for response"
+          />
+       </div>
+     </form>
 
-      <div className="carvis-status pointer-events-none absolute bottom-10 left-1/2 z-20 -translate-x-1/2">
+      <div className="carvis-empty-hint" aria-hidden="true">try: "what's due this week?"</div>
+      <div
+        className="carvis-status pointer-events-none absolute bottom-10 left-1/2 z-20 -translate-x-1/2" role="status" aria-live="polite">
         {statusText}
       </div>
       <div className="carvis-label pointer-events-none absolute bottom-4 left-1/2 z-20 -translate-x-1/2">
         CARVIS
-      </div>
+     </div>
     </div>
   );
 }

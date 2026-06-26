@@ -1,8 +1,19 @@
 import { useState, useEffect } from "react";
-import { Volume2, VolumeX, Bell, BellOff, Moon, User, AlertCircle, RefreshCw, ArrowLeft, LogOut, Loader2 } from "lucide-react";
+import { Volume2, VolumeX, Bell, BellOff, Moon, User, AlertCircle, RefreshCw, ArrowLeft, LogOut, Loader2, Trash2, Users } from "lucide-react";
 import CanvasConnectButton from "@/components/auth/CanvasConnectButton";
 import { Link, useLocation } from "wouter";
 import { usePush, type PushPermission } from "@/hooks/use-push";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { clearRecentAccounts } from "@/lib/recent-accounts";
 
 export default function SettingsPage() {
   const [, navigate] = useLocation();
@@ -11,7 +22,16 @@ export default function SettingsPage() {
   const [syncing, setSyncing] = useState(false);
   const [syncResult, setSyncResult] = useState<string | null>(null);
   const [canvasConnected, setCanvasConnected] = useState(false);
+  // "password" | "canvas" | "both" — used by the delete-account dialog to
+  // decide whether to ask for a password re-prompt. Canvas-only users have
+  // nothing to verify with, so the valid session cookie is the proof.
+  const [authProvider, setAuthProvider] = useState<"password" | "canvas" | "both" | null>(null);
   const [signingOut, setSigningOut] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deletePassword, setDeletePassword] = useState("");
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [switchDialogOpen, setSwitchDialogOpen] = useState(false);
 
   // Web-push: real subscription via the service worker. The hook reports
   // its capability state — we render a permission badge and toggle that
@@ -23,7 +43,14 @@ export default function SettingsPage() {
   useEffect(() => {
     fetch("/api/user/data", { credentials: "include" })
       .then((r) => r.json())
-      .then((data) => setCanvasConnected(!!data.user?.canvasBaseUrl))
+      .then((data) => {
+        setCanvasConnected(!!data.user?.canvasBaseUrl);
+        // The delete-account dialog uses authProvider to decide whether
+        // to ask for a password re-prompt.
+        if (data.user?.authProvider === "password" || data.user?.authProvider === "canvas" || data.user?.authProvider === "both") {
+          setAuthProvider(data.user.authProvider);
+        }
+      })
       .catch(() => setCanvasConnected(false));
   }, []);
 
@@ -85,6 +112,64 @@ export default function SettingsPage() {
       // ignore
     }
     navigate("/signin", { replace: true });
+  };
+
+  const handleSwitchAccount = () => {
+    // Switch is just a sign-out that lands on /signin — the recent-account
+    // tabs there let the user pick a different account. We still ask for
+    // confirmation so they don't lose their place by accident.
+    setSwitchDialogOpen(true);
+  };
+
+  const confirmSwitchAccount = async () => {
+    setSwitchDialogOpen(false);
+    await handleSignOut();
+  };
+
+  const handleDeleteAccount = async () => {
+    if (deleting) return;
+    const needsPassword = authProvider === "password" || authProvider === "both";
+    if (needsPassword && !deletePassword) {
+      setDeleteError("Enter your password to confirm");
+      return;
+    }
+    setDeleting(true);
+    setDeleteError(null);
+    try {
+      const res = await fetch("/api/auth/delete-account", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(needsPassword ? { password: deletePassword } : {}),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) {
+        // Wipe the recent-accounts list entirely — the deleted user
+        // shouldn't keep haunting the signin page tabs.
+        clearRecentAccounts();
+        try {
+          window.localStorage.removeItem("jarvis_session_token");
+        } catch {
+          // ignore
+        }
+        navigate("/signin", { replace: true });
+        return;
+      }
+      // Map server error codes to user-facing copy.
+      if (data.code === "wrong_password") {
+        setDeleteError("Wrong password — try again");
+      } else if (data.code === "bad_request") {
+        setDeleteError(data.error ?? "Check your input and try again");
+      } else if (data.code === "server_error" || res.status >= 500) {
+        setDeleteError("Something went wrong on our end — try again in a moment");
+      } else {
+        setDeleteError(data.error ?? "Couldn't delete your account");
+      }
+    } catch {
+      setDeleteError("Connection error — check your internet");
+    } finally {
+      setDeleting(false);
+    }
   };
 
   return (
@@ -195,17 +280,128 @@ export default function SettingsPage() {
             <p className="font-rajdhani text-[13px] text-[#5a7a8a]">
               Sign out of CARVIS on this device. Your account and data stay — you can sign back in any time.
             </p>
-            <button
-              onClick={handleSignOut}
-              disabled={signingOut}
-              className="hud-btn px-4 py-2.5 flex items-center gap-2 disabled:opacity-50 w-fit border-[#FF4444]/30 hover:border-[#FF4444] hover:bg-[#FF4444]/10"
-            >
-              <LogOut className="w-4 h-4" />
-              <span>{signingOut ? "SIGNING OUT…" : "SIGN OUT"}</span>
-            </button>
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={handleSwitchAccount}
+                className="hud-btn px-4 py-2.5 flex items-center gap-2 w-fit border-[#FF4444]/30 hover:border-[#FF4444] hover:bg-[#FF4444]/10"
+              >
+                <Users className="w-4 h-4" />
+                <span>SWITCH ACCOUNT</span>
+              </button>
+              <button
+                onClick={handleSignOut}
+                disabled={signingOut}
+                className="hud-btn px-4 py-2.5 flex items-center gap-2 disabled:opacity-50 w-fit border-[#FF4444]/30 hover:border-[#FF4444] hover:bg-[#FF4444]/10"
+              >
+                <LogOut className="w-4 h-4" />
+                <span>{signingOut ? "SIGNING OUT…" : "SIGN OUT"}</span>
+              </button>
+            </div>
           </div>
         </SettingsSection>
+
+        {/*
+          Danger zone — separate, scary-red panel so the user really
+          reads the surrounding copy before clicking. The button is
+          smaller than the sign-out (because deleting a whole account
+          deserves a more deliberate affordance) but the AlertDialog
+          on the next click forces a confirmation step.
+        */}
+        <div className="hud-panel mb-8 p-6 border-[#FF4444]/40">
+          <span className="corner-br" />
+          <div className="hud-section-header mb-5">
+            <div className="p-1.5 border border-[#FF4444]/40 text-[#FF4444] rounded">
+              <Trash2 className="w-4 h-4" />
+            </div>
+            <h2 className="font-orbitron text-[11px] font-bold tracking-[0.2em] text-[#FF4444]">DANGER ZONE</h2>
+          </div>
+          <div className="space-y-4">
+            <p className="font-rajdhani text-[13px] text-[rgba(245,245,245,0.4)]">
+              Permanently delete your account. All your courses, assignments, and grades will be erased. This cannot be undone.
+            </p>
+            <button
+              onClick={() => {
+                setDeletePassword("");
+                setDeleteError(null);
+                setDeleteDialogOpen(true);
+              }}
+              className="hud-btn px-4 py-2.5 flex items-center gap-2 w-fit border-[#FF4444] bg-[#FF4444]/10 hover:bg-[#FF4444]/20"
+            >
+              <Trash2 className="w-4 h-4" />
+              <span>DELETE ACCOUNT</span>
+            </button>
+          </div>
+        </div>
       </div>
+
+      <AlertDialog open={switchDialogOpen} onOpenChange={setSwitchDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Sign out and switch accounts?</AlertDialogTitle>
+            <AlertDialogDescription>
+              You'll be returned to the sign-in screen where you can pick a different account from the saved tabs. Your data stays safe on the server.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Stay signed in</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmSwitchAccount}>Switch account</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={deleteDialogOpen}
+        onOpenChange={(open) => {
+          // Don't allow closing the dialog mid-delete — would leave the
+          // user in a half-state (request fired but dialog dismissed).
+          if (deleting) return;
+          setDeleteDialogOpen(open);
+          if (!open) {
+            setDeletePassword("");
+            setDeleteError(null);
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete your account permanently?</AlertDialogTitle>
+            <AlertDialogDescription>
+              All your courses, assignments, and grades will be erased. This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          {(authProvider === "password" || authProvider === "both") && (
+            <div className="space-y-2">
+              <label htmlFor="delete-password" className="font-orbitron text-[10px] font-bold tracking-[0.15em] text-[rgba(245,245,245,0.4)] block">
+                CONFIRM YOUR PASSWORD
+              </label>
+              <input
+                id="delete-password"
+                type="password"
+                value={deletePassword}
+                onChange={(e) => { setDeletePassword(e.target.value); setDeleteError(null); }}
+                placeholder="Your password"
+                className="w-full px-4 py-3 bg-[#0a0000] border border-[#FF4444]/40 text-[#f5f5f5] font-mono text-[13px] placeholder:text-[rgba(245,245,245,0.25)] focus:border-[#FF4444] focus:outline-none transition rounded-lg"
+                autoComplete="current-password"
+                onKeyDown={(e) => e.key === "Enter" && !deleting && handleDeleteAccount()}
+                autoFocus
+              />
+            </div>
+          )}
+          {deleteError && (
+            <p className="font-rajdhani text-[12px] text-[#FF6B3D]">{deleteError}</p>
+          )}
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteAccount}
+              disabled={deleting}
+              className="bg-[#FF4444] text-white hover:bg-[#FF4444]/90"
+            >
+              {deleting ? "DELETING…" : "DELETE FOREVER"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

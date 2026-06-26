@@ -243,8 +243,14 @@ export default function CinematicDemo({ active }: Props) {
     if (!started || !typingDone || stepIndex >= DEMO_SCRIPT.length) return;
 
     const step = DEMO_SCRIPT[stepIndex];
+    // Hoist the (conditional) reveal value into a local `const` so the
+    // narrowed string type survives into the setRevealed closure below.
+    // TypeScript loses narrowing across closure boundaries because the
+    // callback may run later; capturing into a local preserves the type
+    // information without resorting to non-null assertions.
     if (step.reveal) {
-      setRevealed((prev) => new Set(prev).add(step.reveal));
+      const revealValue: string = step.reveal;
+      setRevealed((prev) => new Set(prev).add(revealValue));
     }
 
     const nextDelay = stepIndex < DEMO_SCRIPT.length - 1

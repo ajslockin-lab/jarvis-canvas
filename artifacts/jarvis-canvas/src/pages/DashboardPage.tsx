@@ -41,6 +41,7 @@ import AssignmentCard from "@/components/dashboard/AssignmentCard";
 import FunctionalCalendar from "@/components/dashboard/FunctionalCalendar";
 import GradesPanel from "@/components/dashboard/GradesPanel";
 import ProactiveFeed from "@/components/dashboard/ProactiveFeed";
+import NotesPanel from "@/components/dashboard/NotesPanel";
 import FirstRunBanner, { type SyncPhase } from "@/components/dashboard/FirstRunBanner";
 import FirstRunNudge from "@/components/dashboard/FirstRunNudge";
 import {
@@ -644,6 +645,8 @@ export default function DashboardPage() {
                 onDismiss={firstRun.dismissNudge}
               />
             )}
+
+            <NotesPanel />
 
             <div className="hud-panel p-5">
               <span className="corner-br" />

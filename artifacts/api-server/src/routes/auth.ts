@@ -3,12 +3,18 @@ import { randomBytes, randomInt } from "crypto";
 import { sql } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import { db } from "@workspace/db";
-import { usersTable, sessionsTable, emailVerificationsTable } from "@workspace/db/schema";
-import { eq, and, isNull, desc } from "drizzle-orm";
+import { usersTable, sessionsTable, emailVerificationsTable, passwordResetsTable } from "@workspace/db/schema";
+import { eq, and, isNull, desc, gt, ne } from "drizzle-orm";
 import { encrypt } from "../lib/crypto.js";
 import { fetchCanvasUser } from "../lib/canvas-fetch.js";
 import { z } from "zod";
-import { sendVerificationCode, devVerificationCodeIfEnabled } from "../lib/email.js";
+import {
+  sendVerificationCode,
+  sendPasswordResetCode,
+  devVerificationCodeIfEnabled,
+  devPasswordResetCodeIfEnabled,
+} from "../lib/email.js";
+import { requireAuth } from "../lib/auth.js";
 
 const router = Router();
 
@@ -42,6 +48,14 @@ export const ErrorCodes = {
   invalidCode: "invalid_code",
   resendTooSoon: "resend_too_soon",
   passwordTooShort: "password_too_short",
+  // New — for password reset, delete, and switch:
+  accountDeleted: "account_deleted",
+  resetNotFound: "reset_not_found",
+  resetExpired: "reset_expired",
+  resetInvalidCode: "reset_invalid_code",
+  resetTooManyAttempts: "reset_too_many_attempts",
+  wrongPassword: "wrong_password",
+  noAccountOnDevice: "no_account_on_device",
 } as const;
 
 export type ErrorCode = (typeof ErrorCodes)[keyof typeof ErrorCodes];
@@ -68,11 +82,21 @@ function createSessionCookie(res: import("express").Response, sessionId: string)
 // Accept both *.instructure.com (hosted) and self-hosted Canvas
 // (e.g. canvas.gatech.edu, canvas.mit.edu, canvas.ubc.ca).
 // Self-hosted instances are common at R1 universities.
-const INSTUCTURE_RE = /^https:\/\/[a-zA-Z0-9-]+\.instructure\.com$/;
-const SELF_HOSTED_RE = /^https:\/\/canvas\.[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+const INSTUCTURE_RE = /^https:\/\/[a-zA-Z0-9-]+\.instructure\.com$/i;
+const SELF_HOSTED_RE = /^https:\/\/canvas\.[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/i;
 
-export const VALIDATE_CANVAS_URL = (u: string): boolean =>
-  INSTUCTURE_RE.test(u) || SELF_HOSTED_RE.test(u);
+// Normalize before validating: drop trailing slashes and surrounding whitespace.
+// Otherwise a value like "https://gavirtual.instructure.com/" (which most
+// copy-pasted URLs from the address bar include) fails validation, even
+// though the downstream code already strips slashes after the fact.
+function normalizeCanvasUrl(u: string): string {
+  return u.trim().replace(/\/+$/, "");
+}
+
+export const VALIDATE_CANVAS_URL = (u: string): boolean => {
+  const normalized = normalizeCanvasUrl(u);
+  return INSTUCTURE_RE.test(normalized) || SELF_HOSTED_RE.test(normalized);
+};
 
 // Email-style validation message for Zod schemas
 const CANVAS_URL_MSG = "Must be a valid Canvas URL (e.g. https://school.instructure.com or https://canvas.school.edu)";
@@ -439,7 +463,9 @@ router.post("/auth/canvas/start", async (req, res) => {
       return;
     }
 
-    const { canvasUrl } = parsed.data;
+    const { canvasUrl: rawCanvasUrl } = parsed.data;
+    // Normalize so concatenation below never yields "//login/..." (double slash).
+    const canvasUrl = normalizeCanvasUrl(rawCanvasUrl);
     const clientId = process.env["CANVAS_CLIENT_ID"];
     if (!clientId) {
       sendError(res, 400, ErrorCodes.serverError, "OAuth not configured — use PAT authentication instead");
@@ -499,6 +525,10 @@ router.get("/auth/canvas", async (req, res) => {
       res.redirect(`${appUrl}/signin?error=${encodeURIComponent("Invalid Canvas URL in OAuth session")}`);
       return;
     }
+    // Normalize here too — the cookie may have been written from an older
+    // request that didn't strip slashes, or the user pasted with one. Keeping
+    // it consistent means no double slashes in the token-exchange URL below.
+    const normalizedCanvasUrl = normalizeCanvasUrl(canvasUrl);
 
     const clientId = process.env["CANVAS_CLIENT_ID"];
     const clientSecret = process.env["CANVAS_CLIENT_SECRET"];
@@ -508,7 +538,7 @@ router.get("/auth/canvas", async (req, res) => {
     }
 
     const redirectUri = `${appUrl}/api/auth/canvas`;
-    const tokenRes = await fetch(`${canvasUrl}/login/oauth2/token`, {
+    const tokenRes = await fetch(`${normalizedCanvasUrl}/login/oauth2/token`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ grant_type: "authorization_code", client_id: clientId, client_secret: clientSecret, redirect_uri: redirectUri, code }),
@@ -524,7 +554,7 @@ router.get("/auth/canvas", async (req, res) => {
     const refreshToken = tokenData.refresh_token ?? null;
     const expiresAt = tokenData.expires_in ? new Date(Date.now() + tokenData.expires_in * 1000) : null;
 
-    const canvasUser = await fetchCanvasUser(accessToken, canvasUrl);
+    const canvasUser = await fetchCanvasUser(accessToken, normalizedCanvasUrl);
     const email = canvasUser.primary_email || canvasUser.login_id || `user${canvasUser.id}@canvas.local`;
     const userId = `canvas-${canvasUser.id}`;
 
@@ -532,7 +562,7 @@ router.get("/auth/canvas", async (req, res) => {
     const userData = {
       email,
       name: canvasUser.name,
-      canvasBaseUrl: canvasUrl,
+      canvasBaseUrl: normalizedCanvasUrl,
       canvasAccessTokenEncrypted: encrypt(accessToken),
       canvasRefreshTokenEncrypted: refreshToken ? encrypt(refreshToken) : null,
       canvasTokenExpiresAt: expiresAt,
@@ -598,7 +628,10 @@ router.post("/auth/canvas/pat", async (req, res) => {
     }
 
     const { canvasUrl, pat } = parsed.data;
-    const canvasBase = canvasUrl.replace(/\/+$/, "");
+    // Safe to ignore the trailing-slash variant here — validation now accepts it,
+    // and downstream code wants a clean origin without a trailing slash for
+    // string concatenation like `${canvasBase}/api/v1/courses`.
+    const canvasBase = normalizeCanvasUrl(canvasUrl);
 
     // Preflight: verify the Canvas URL actually exists before trying the token.
     // This way we can tell the user "your token is wrong" vs "your URL is wrong."
@@ -693,6 +726,276 @@ router.post("/auth/signout", async (req, res) => {
 
   res.clearCookie("jarvis_session", { path: "/" });
   res.json({ success: true });
+});
+
+// ---------- Password reset: request, perform, resend ----------
+
+const requestResetSchema = z.object({
+  email: z.string().min(1, "Email is required").email("Enter a valid email address"),
+});
+
+const performResetSchema = z.object({
+  userId: z.string().min(1, "userId is required"),
+  code: z.string().regex(/^\d{6}$/, "Code must be 6 digits"),
+  newPassword: z
+    .string()
+    .min(8, "Password must be at least 8 characters")
+    .max(200, "Password is too long"),
+});
+
+// User-enumeration defense: we always return the same success shape, even for
+// emails that don't exist. The dev-mode `devCode` is only included when the
+// email was actually found — it never leaks existence to a real caller.
+router.post("/auth/request-password-reset", async (req, res) => {
+  try {
+    const parsed = requestResetSchema.safeParse(req.body);
+    if (!parsed.success) {
+      sendError(res, 400, ErrorCodes.badRequest, parsed.error.issues[0]?.message ?? "Invalid request");
+      return;
+    }
+    const emailLower = parsed.data.email.toLowerCase();
+
+    const [user] = await db
+      .select({ id: usersTable.id, email: usersTable.email, passwordHash: usersTable.passwordHash })
+      .from(usersTable)
+      .where(sql`LOWER(${usersTable.email}) = ${emailLower}`)
+      .limit(1);
+
+    // No user OR a Canvas-only user (no password to reset) — return the
+    // generic success and don't send anything. The devCode field stays null.
+    if (!user || !user.passwordHash) {
+      res.json({ ok: true });
+      return;
+    }
+
+    // 60s cooldown: latest unconsumed row must be old enough.
+    const [latest] = await db
+      .select()
+      .from(passwordResetsTable)
+      .where(
+        and(
+          eq(passwordResetsTable.userId, user.id),
+          isNull(passwordResetsTable.consumedAt),
+        ),
+      )
+      .orderBy(desc(passwordResetsTable.createdAt))
+      .limit(1);
+
+    if (latest && latest.createdAt.getTime() + VERIFICATION_RESEND_COOLDOWN_MS > Date.now()) {
+      // Tell them to wait. We could 429, but the user can't enumerate this
+      // from outside because they only know it for their own email.
+      sendError(res, 429, ErrorCodes.resendTooSoon, "Wait a moment before requesting another code");
+      return;
+    }
+
+    const code = generateVerificationCode();
+    const codeHash = await bcrypt.hash(code, 10);
+
+    if (latest) {
+      await db
+        .update(passwordResetsTable)
+        .set({ consumedAt: new Date() })
+        .where(eq(passwordResetsTable.id, latest.id));
+    }
+
+    await db.insert(passwordResetsTable).values({
+      id: newId("rst"),
+      userId: user.id,
+      codeHash,
+      expiresAt: new Date(Date.now() + VERIFICATION_TTL_MS),
+    });
+
+    await sendPasswordResetCode(user.email, code);
+
+    res.json({
+      ok: true,
+      // Only present in dev — see devPasswordResetCodeIfEnabled.
+      devCode: devPasswordResetCodeIfEnabled(code),
+    });
+  } catch (err) {
+    console.error("Request-password-reset error:", err);
+    sendError(res, 500, ErrorCodes.serverError, "Something went wrong on our end");
+  }
+});
+
+router.post("/auth/perform-password-reset", async (req, res) => {
+  try {
+    const parsed = performResetSchema.safeParse(req.body);
+    if (!parsed.success) {
+      const issue = parsed.error.issues[0];
+      sendError(res, 400, ErrorCodes.badRequest, issue?.message ?? "Invalid request");
+      return;
+    }
+    const { userId, code, newPassword } = parsed.data;
+
+    const [reset] = await db
+      .select()
+      .from(passwordResetsTable)
+      .where(
+        and(
+          eq(passwordResetsTable.userId, userId),
+          isNull(passwordResetsTable.consumedAt),
+        ),
+      )
+      .orderBy(desc(passwordResetsTable.createdAt))
+      .limit(1);
+
+    if (!reset) {
+      sendError(res, 400, ErrorCodes.resetNotFound, "No pending reset — request a new code");
+      return;
+    }
+    if (reset.expiresAt < new Date()) {
+      sendError(res, 400, ErrorCodes.resetExpired, "That code expired — request a new one");
+      return;
+    }
+    if (reset.attempts >= VERIFICATION_MAX_ATTEMPTS) {
+      sendError(res, 429, ErrorCodes.resetTooManyAttempts, "Too many attempts — start over from the reset page");
+      return;
+    }
+
+    const ok = await bcrypt.compare(code, reset.codeHash);
+    if (!ok) {
+      await db
+        .update(passwordResetsTable)
+        .set({ attempts: reset.attempts + 1 })
+        .where(eq(passwordResetsTable.id, reset.id));
+      sendError(res, 400, ErrorCodes.resetInvalidCode, "That code didn't match — try again");
+      return;
+    }
+
+    // Success: mark consumed, hash new password, write it back. Invalidate
+    // every existing session for this user so a stolen device can't keep
+    // using the old password.
+    await db
+      .update(passwordResetsTable)
+      .set({ consumedAt: new Date() })
+      .where(eq(passwordResetsTable.id, reset.id));
+
+    const newHash = await bcrypt.hash(newPassword, 10);
+    await db
+      .update(usersTable)
+      .set({ passwordHash: newHash, updatedAt: new Date() })
+      .where(eq(usersTable.id, userId));
+    await db.delete(sessionsTable).where(eq(sessionsTable.userId, userId));
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error("Perform-password-reset error:", err);
+    sendError(res, 500, ErrorCodes.serverError, "Something went wrong on our end");
+  }
+});
+
+// ---------- Account deletion ----------
+
+const deleteAccountSchema = z.object({
+  // Empty body is allowed for Canvas-only users; we only verify a password
+  // when one is set on the account.
+  password: z.string().min(1).max(200).optional(),
+});
+
+router.post("/auth/delete-account", async (req, res) => {
+  const user = await requireAuth(req, res);
+  if (!user) return;
+
+  const parsed = deleteAccountSchema.safeParse(req.body ?? {});
+  if (!parsed.success) {
+    sendError(res, 400, ErrorCodes.badRequest, "Invalid request");
+    return;
+  }
+
+  try {
+    if (user.passwordHash) {
+      // Password-protected account: require the password to confirm. The
+      // requireAuth check above already proved the user has a valid session,
+      // but a re-prompt is the right defense against a stolen device.
+      if (!parsed.data.password) {
+        sendError(res, 400, ErrorCodes.badRequest, "Password is required to delete your account");
+        return;
+      }
+      const ok = await bcrypt.compare(parsed.data.password, user.passwordHash);
+      if (!ok) {
+        sendError(res, 401, ErrorCodes.wrongPassword, "Wrong password");
+        return;
+      }
+    }
+    // Canvas-only user: no password to verify — the valid session cookie is
+    // the proof. requireAuth's origin check is the CSRF gate.
+
+    // Cascade FKs wipe courses / assignments / grades / sessions /
+    // conversations / push subscriptions / email verifications / resets.
+    await db.delete(usersTable).where(eq(usersTable.id, user.id));
+
+    res.clearCookie("jarvis_session", { path: "/" });
+    res.json({ success: true });
+  } catch (err) {
+    console.error("Delete-account error:", err);
+    sendError(res, 500, ErrorCodes.serverError, "Something went wrong on our end");
+  }
+});
+
+// ---------- Switch account (device-local) ----------
+
+const switchAccountSchema = z.object({
+  userId: z.string().min(1, "userId is required"),
+  // The session token stored in localStorage on a previous sign-in. It's
+  // validated against sessionsTable here.
+  sessionToken: z.string().min(1, "sessionToken is required"),
+});
+
+router.post("/auth/switch-account", async (req, res) => {
+  try {
+    const parsed = switchAccountSchema.safeParse(req.body);
+    if (!parsed.success) {
+      sendError(res, 400, ErrorCodes.badRequest, parsed.error.issues[0]?.message ?? "Invalid request");
+      return;
+    }
+    const { userId, sessionToken } = parsed.data;
+
+    const now = new Date();
+    const [session] = await db
+      .select()
+      .from(sessionsTable)
+      .where(
+        and(
+          eq(sessionsTable.id, sessionToken),
+          eq(sessionsTable.userId, userId),
+          gt(sessionsTable.expiresAt, now),
+        ),
+      )
+      .limit(1);
+
+    if (!session) {
+      sendError(res, 401, ErrorCodes.noAccountOnDevice, "That account is no longer signed in on this device");
+      return;
+    }
+
+    const [user] = await db
+      .select({ id: usersTable.id, email: usersTable.email, name: usersTable.name, canvasBaseUrl: usersTable.canvasBaseUrl })
+      .from(usersTable)
+      .where(eq(usersTable.id, userId))
+      .limit(1);
+
+    if (!user) {
+      // The user was hard-deleted between when the tab was written and the
+      // click. Tell the frontend to drop the tab.
+      sendError(res, 401, ErrorCodes.noAccountOnDevice, "That account no longer exists");
+      return;
+    }
+
+    // Re-issue as a fresh cookie so the dashboard's next request picks up
+    // the new auth state. We keep the same session row id to preserve the
+    // expiry — only the cookie name binding matters to the browser.
+    createSessionCookie(res, session.id);
+
+    res.json({
+      success: true,
+      sessionToken: session.id,
+      user: { id: user.id, email: user.email, name: user.name, canvasBaseUrl: user.canvasBaseUrl },
+    });
+  } catch (err) {
+    console.error("Switch-account error:", err);
+    sendError(res, 500, ErrorCodes.serverError, "Something went wrong on our end");
+  }
 });
 
 export default router;

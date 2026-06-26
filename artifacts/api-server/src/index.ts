@@ -2,6 +2,7 @@ import app from "./app";
 import { logger } from "./lib/logger";
 import { pool } from "@workspace/db";
 import { startSyncScheduler, stopSyncScheduler } from "./lib/sync-scheduler.js";
+import { startReminderScheduler, stopReminderScheduler } from "./lib/reminder-scheduler.js";
 
 const rawPort = process.env["PORT"];
 
@@ -51,6 +52,8 @@ const server = app.listen(port, (err) => {
 
   // Start background Canvas sync scheduler (disabled unless CANVAS_SYNC_ENABLED=true)
   startSyncScheduler();
+  // Start background reminder scheduler (disabled unless REMINDER_SCHEDULER_ENABLED=true)
+  startReminderScheduler();
 });
 
 // Graceful shutdown — drain connections before exiting
@@ -62,6 +65,7 @@ async function shutdown(signal: string) {
   logger.info({ signal }, "Shutting down...");
 
   stopSyncScheduler();
+  stopReminderScheduler();
 
   // Stop accepting new connections
   server.close(() => {
