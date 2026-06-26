@@ -73,7 +73,10 @@ $combined = ($sql -join "
 -- next migration
 -- =============================================================
 ")
-Set-Content -Path ".combined.sql" -Value $combined -Encoding utf8
+# Write ASCII (no BOM) -- PowerShell's default for Set-Content uses UTF-8
+# with BOM (PS 5.1 default), which Postgres rejects as a syntax error.
+$utf8NoBom = New-Object System.Text.UTF8Encoding $false
+[System.IO.File]::WriteAllText((Resolve-Path .).Path + "\.combined.sql", $combined, $utf8NoBom)
 
 # Run the migration from lib/db so node can resolve `pg` via pnpm hoisting.
 # Use an absolute path so the relative path stays valid after Push-Location.
