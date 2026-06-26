@@ -11,6 +11,8 @@
   if (document.getElementById(BUBBLE_ID)) return;
 
   let overlay = null;
+  let observer = null;
+  let moTimer = null;
   let appOrigin = DEFAULT_APP_URL;
 
   function getAppUrl(cb) {
@@ -61,6 +63,13 @@
       "nav a",
       "#global_nav a",
       ".ic-app-header__main-navigation a",
+      "[role="tab"]",
+      "[role="treeitem"]",
+      "[aria-expanded]",
+      "[aria-controls]",
+      "[data-module-id]",
+      ".context_module",
+      ".module-url",
     ].join(", ");
 
     let index = 0;
@@ -83,6 +92,9 @@
         ariaLabel: el.getAttribute("aria-label") || undefined,
         placeholder: el.getAttribute("placeholder") || undefined,
         href,
+        role: el.getAttribute("role") || undefined,
+        ariaExpanded: el.getAttribute("aria-expanded") || undefined,
+        dataModuleId: el.getAttribute("data-module-id") || undefined,
       });
 
       if (elements.length >= MAX_ELEMENTS) break;
@@ -119,6 +131,25 @@
           input.value = action.value || "";
           input.dispatchEvent(new Event("input", { bubbles: true }));
           input.dispatchEvent(new Event("change", { bubbles: true }));
+        }
+        break;
+      }
+      case "keypress": {
+        const t = document.querySelector(`[${ELEMENT_ATTR}="${action.elementId}"]`);
+        if (t instanceof HTMLElement) {
+          t.focus();
+          const k = action.key || "";
+          t.dispatchEvent(new KeyboardEvent("keydown", { key: k, bubbles: true }));
+          t.dispatchEvent(new KeyboardEvent("keypress", { key: k, bubbles: true }));
+          t.dispatchEvent(new KeyboardEvent("keyup", { key: k, bubbles: true }));
+        }
+        break;
+      }
+      case "select": {
+        const sel0 = document.querySelector(`[${ELEMENT_ATTR}="${action.elementId}"]`);
+        if (sel0 instanceof HTMLSelectElement) {
+          sel0.value = action.value || "";
+          sel0.dispatchEvent(new Event("change", { bubbles: true }));
         }
         break;
       }
@@ -171,9 +202,51 @@
       return;
     }
 
+    if (data.type === "jarvis-read-element" && data.elementId) {
+      const el = document.querySelector(`[${ELEMENT_ATTR}="${data.elementId}"]`);
+      const payload = { type: "jarvis-read-element-result", elementId: data.elementId, found: !!el };
+      if (el instanceof HTMLElement) {
+        payload.tag = el.tagName.toLowerCase();
+        payload.text = (el.innerText || el.textContent || "").replace(/\s+/g, " ").trim().slice(0, 4000);
+        payload.html = el.innerHTML.slice(0, 8000);
+        payload.attrs = {};
+        for (const a of el.attributes) payload.attrs[a.name] = a.value;
+      }
+      event.source.postMessage(payload, event.origin);
+      return;
+    }
+
+    if (data.type === "jarvis-read-selection") {
+      const sel = (typeof window.getSelection === "function") ? String(window.getSelection() || "") : "";
+      event.source.postMessage({ type: "jarvis-read-selection-result", text: sel }, event.origin);
+      return;
+    }
+
     if (data.type === "jarvis-close") {
       closeOverlay();
     }
+  }
+
+  function startObserver() {
+    if (observer) return;
+    observer = new MutationObserver(() => {
+      if (moTimer) return;
+      moTimer = setTimeout(() => {
+        moTimer = null;
+        if (overlay && overlay.contentWindow) {
+          overlay.contentWindow.postMessage(
+            { type: "jarvis-context-delta", url: window.location.href, title: document.title },
+            appOrigin
+          );
+        }
+      }, 250);
+    });
+    observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ["aria-expanded", "aria-selected", "class"] });
+  }
+
+  function stopObserver() {
+    if (observer) { observer.disconnect(); observer = null; }
+    if (moTimer) { clearTimeout(moTimer); moTimer = null; }
   }
 
   function openOverlay() {
@@ -197,11 +270,13 @@
     if (typeof chrome !== "undefined" && chrome.storage?.local) {
       chrome.storage.local.get(["sessionToken"], (result) => {
         mount(result.sessionToken || null);
+        startObserver();
       });
       return;
     }
 
     mount(null);
+    startObserver();
   }
 
   function closeOverlay() {
@@ -212,6 +287,7 @@
 
     const bubble = document.getElementById(BUBBLE_ID);
     if (bubble) bubble.style.display = "flex";
+    stopObserver();
   }
 
   function toggleOverlay() {
