@@ -76,8 +76,10 @@ $combined = ($sql -join "
 Set-Content -Path ".combined.sql" -Value $combined -Encoding utf8
 
 # Run the migration from lib/db so node can resolve `pg` via pnpm hoisting.
+# Use an absolute path so the relative path stays valid after Push-Location.
+$combinedAbs = (Resolve-Path .combined.sql).Path
 Push-Location lib/db
-node --input-type=module -e "import pg from 'pg'; import {readFileSync} from 'node:fs'; const c = new pg.Client({connectionString: process.env.DATABASE_URL}); await c.connect(); try { await c.query(readFileSync('../.combined.sql','utf8')); console.log('migrations applied'); } finally { await c.end(); }"
+node --input-type=module -e "import pg from 'pg'; import {readFileSync} from 'node:fs'; const c = new pg.Client({connectionString: process.env.DATABASE_URL}); await c.connect(); try { await c.query(readFileSync(process.argv[1],'utf8')); console.log('migrations applied'); } finally { await c.end(); }" "$combinedAbs"
 $nodeExit = $LASTEXITCODE
 Pop-Location
 Remove-Item ".combined.sql"
