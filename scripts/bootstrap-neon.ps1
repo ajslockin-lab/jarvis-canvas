@@ -40,8 +40,13 @@ if (-not $psqlOk) {
     if ($LASTEXITCODE -ne 0) {
         throw "wipe-db.mjs failed. Ensure DATABASE_URL is reachable."
     }
+    # inline DROP SCHEMA -- run from lib/db so node can resolve `pg`
+    # (.pnpm virtual store, not at workspace root).
+    Push-Location lib/db
     node -e "import('pg').then(async ({default:pg})=>{const c=new pg.Client({connectionString:process.env.DATABASE_URL}); await c.connect(); try { await c.query('DROP SCHEMA public CASCADE'); await c.query('CREATE SCHEMA public'); await c.query('GRANT ALL ON SCHEMA public TO PUBLIC'); console.log('public schema dropped + recreated'); } finally { await c.end(); }});"
-    if ($LASTEXITCODE -ne 0) {
+    $nodeExit = $LASTEXITCODE
+    Pop-Location
+    if ($nodeExit -ne 0) {
         throw "DROP SCHEMA public CASCADE failed. Inspect DATABASE_URL and connectivity."
     }
 }
@@ -71,8 +76,16 @@ $combined = ($sql -join "
 -- =============================================================
 ")
 Set-Content -Path ".combined.sql" -Value $combined -Encoding utf8
-node -e "import('pg').then(async ({default:pg})=>{const c = new pg.Client({connectionString: process.env.DATABASE_URL}); await c.connect(); try { await c.query(require('node:fs').readFileSync('.combined.sql','utf8')); console.log('migrations applied'); } finally { await c.end(); }});"
+
+# Run the migration from lib/db so node can resolve `pg` via pnpm hoisting.
+Push-Location lib/db
+node --input-type=module -e "import pg from 'pg'; import {readFileSync} from 'node:fs'; const c = new pg.Client({connectionString: process.env.DATABASE_URL}); await c.connect(); try { await c.query(readFileSync('../.combined.sql','utf8')); console.log('migrations applied'); } finally { await c.end(); }"
+$nodeExit = $LASTEXITCODE
+Pop-Location
 Remove-Item ".combined.sql"
+if ($nodeExit -ne 0) {
+    throw "Applying combined migrations failed."
+}
 
 Write-Host "Re-applying security hardening idempotently..." -ForegroundColor Cyan
 node lib/db/scripts/apply-security-hardening.mjs
