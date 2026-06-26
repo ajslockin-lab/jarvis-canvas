@@ -51,7 +51,7 @@ if (-not $psqlOk) {
     }
 }
 
-Write-Host "Applying schema migrations 0000-0007..." -ForegroundColor Cyan
+Write-Host "Applying schema migrations 0000-0008..." -ForegroundColor Cyan
 $sql = @()
 foreach ($m in @(
     "0000_init.sql",

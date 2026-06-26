@@ -27,3 +27,10 @@ CREATE INDEX IF NOT EXISTS "password_resets_user_idx"
 CREATE INDEX IF NOT EXISTS "password_resets_pending_idx"
   ON "password_resets" ("user_id", "created_at" DESC)
   WHERE "consumed_at" IS NULL;
+
+-- Attach the audit trigger to the table we just created. Doing this here
+-- (rather than in 0005) avoids the half-applied migration: 0005 ran on
+-- fresh DBs only if 0008 ran first to make the table.
+DROP TRIGGER IF EXISTS password_resets_audit ON password_resets;
+CREATE TRIGGER password_resets_audit AFTER INSERT OR UPDATE ON password_resets
+  FOR EACH ROW EXECUTE FUNCTION audit_row_change();
