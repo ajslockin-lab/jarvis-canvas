@@ -104,6 +104,28 @@ if ($nodeExit -ne 0) {
     throw "0005_security_hardening failed."
 }
 
+# Attach the password_resets audit trigger now that 0005's audit_row_change()
+# function exists. Idempotent: skips if the trigger is already present. Read the
+# SQL from disk so the dollar-quote blocks stay readable.
+$triggerSql = @'
+DO $tg$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'password_resets_audit') THEN
+    CREATE TRIGGER password_resets_audit AFTER INSERT OR UPDATE ON password_resets
+      FOR EACH ROW EXECUTE FUNCTION audit_row_change();
+  END IF;
+END $tg$;
+'@
+$triggerAbs = Join-Path $repoRoot ".trigger.sql"
+[System.IO.File]::WriteAllText($triggerAbs, $triggerSql, $utf8NoBom)
+Push-Location lib/db
+node --input-type=module -e "import pg from 'pg'; import {readFileSync} from 'node:fs'; const c = new pg.Client({connectionString: process.env.DATABASE_URL}); await c.connect(); try { await c.query(readFileSync(process.argv[1],'utf8')); console.log('password_resets_audit trigger attached'); } finally { await c.end(); }" "$triggerAbs"
+$nodeExit = $LASTEXITCODE
+Pop-Location
+Remove-Item $triggerAbs -ErrorAction SilentlyContinue
+if ($nodeExit -ne 0) {
+    throw "Attaching password_resets_audit trigger failed."
+}
+
 $captured = ""
 if (Test-Path $pwCapturePath) {
     $captured = (Get-Content $pwCapturePath -Raw).Trim()
