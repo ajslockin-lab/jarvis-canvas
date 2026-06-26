@@ -6,10 +6,10 @@
 #
 # Order:
 #   1. wipe (force-drop everything; neon is fresh so safe)
-#   2. 0000_init             — users, sessions, etc.
-#   3. 0001_add_referred_from.sql through 0007 — additive migrations
-#   4. apply-security-hardening — extensions, audit triggers, app role
-#   5. verify-security-hardening — green check
+#   2. 0000_init             -- users, sessions, etc.
+#   3. 0001_add_referred_from.sql through 0007 -- additive migrations
+#   4. apply-security-hardening -- extensions, audit triggers, app role
+#   5. verify-security-hardening -- green check
 #
 # Re-runnable; the wipe step makes that safe.
 
@@ -30,11 +30,11 @@ try {
     $psqlOk = $false
 }
 if (-not $psqlOk) {
-    Write-Host "  (psql not on PATH — falling back to node wipe + DROP SCHEMA)" -ForegroundColor DarkYellow
+    Write-Host "  (psql not on PATH -- falling back to node wipe + DROP SCHEMA)" -ForegroundColor DarkYellow
     # 0000_init.sql uses plain CREATE TABLE (no IF NOT EXISTS), so a
     # schema drop is required for re-runnability. wipe-db.mjs only
     # TRUNCATEs (keeps schema), so we follow it with a DROP SCHEMA via
-    # an inline node snippet — which also proves the connection works.
+    # an inline node snippet -- which also proves the connection works.
     $env:WIPE = "yes"
     node lib/db/scripts/wipe-db.mjs
     if ($LASTEXITCODE -ne 0) {
