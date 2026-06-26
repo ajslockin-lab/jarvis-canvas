@@ -1,0 +1,9 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "buildCommand": "pnpm install --frozen-lockfile && pnpm --filter @workspace/jarvis-canvas --filter @workspace/api-client-react --filter @workspace/api-zod run build",
+  "outputDirectory": "artifacts/jarvis-canvas/dist/public",
+  "framework": "vite",
+  "rewrites": [
+    { "source": "/(.*)", "destination": "/index.html" }
+  ]
+}
