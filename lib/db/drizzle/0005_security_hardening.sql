@@ -16,10 +16,18 @@ CREATE EXTENSION IF NOT EXISTS citext;           -- case-insensitive email
 -- only if it doesn't exist -- the connection pool re-uses it across dev.mjs
 -- restarts. statement_timeout caps runaway queries; idle_in_transaction
 -- prevents forgotten BEGIN blocks from holding row locks.
+--
+-- Password is randomly generated via gen_random_bytes(24) -> hex (48 chars).
+-- Neon's control plane rejects weak literals like 'carvis_app', so the
+-- random strong password is mandatory. bootstrap-neon.ps1 captures the
+-- printed password and writes it to .env so the api-server can use it.
 DO $$
+DECLARE
+  v_pw text := encode(gen_random_bytes(24), 'hex');
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'carvis_app') THEN
-    CREATE ROLE carvis_app LOGIN PASSWORD 'carvis_app';
+    EXECUTE format('CREATE ROLE carvis_app LOGIN PASSWORD %L', v_pw);
+    RAISE NOTICE 'CARVIS_APP_PASSWORD=%', v_pw;
   END IF;
 END
 $$;
@@ -28,7 +36,14 @@ $$;
 -- resets (e.g. embedded-postgres recovering from a crash). The CREATE block
 -- above only runs the password set on a virgin cluster; rerunning without
 -- this would leave the role with whatever auth state survived recovery.
-ALTER ROLE carvis_app LOGIN PASSWORD 'carvis_app';
+DO $$
+DECLARE
+  v_pw text := encode(gen_random_bytes(24), 'hex');
+BEGIN
+  EXECUTE format('ALTER ROLE carvis_app LOGIN PASSWORD %L', v_pw);
+  RAISE NOTICE 'CARVIS_APP_PASSWORD_REFRESH=%', v_pw;
+END
+$$;
 
 ALTER ROLE carvis_app SET statement_timeout = '10s';
 ALTER ROLE carvis_app SET idle_in_transaction_session_timeout = '30s';
