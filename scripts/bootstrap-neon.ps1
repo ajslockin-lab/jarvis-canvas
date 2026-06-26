@@ -22,10 +22,28 @@ if (-not $env:DATABASE_URL) {
 }
 
 Write-Host "Wiping public schema..." -ForegroundColor Cyan
-psql $env:DATABASE_URL -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public; GRANT ALL ON SCHEMA public TO PUBLIC;" 2>&1
-if ($LASTEXITCODE -ne 0) {
-    # psql isn't on PATH; fall back to a tiny node wipe via pg
+$psqlOk = $true
+try {
+    $psqlOut = psql $env:DATABASE_URL -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public; GRANT ALL ON SCHEMA public TO PUBLIC;" 2>&1
+    if ($LASTEXITCODE -ne 0) { $psqlOk = $false }
+} catch {
+    $psqlOk = $false
+}
+if (-not $psqlOk) {
+    Write-Host "  (psql not on PATH — falling back to node wipe + DROP SCHEMA)" -ForegroundColor DarkYellow
+    # 0000_init.sql uses plain CREATE TABLE (no IF NOT EXISTS), so a
+    # schema drop is required for re-runnability. wipe-db.mjs only
+    # TRUNCATEs (keeps schema), so we follow it with a DROP SCHEMA via
+    # an inline node snippet — which also proves the connection works.
+    $env:WIPE = "yes"
     node lib/db/scripts/wipe-db.mjs
+    if ($LASTEXITCODE -ne 0) {
+        throw "wipe-db.mjs failed. Ensure DATABASE_URL is reachable."
+    }
+    node -e "import('pg').then(async ({default:pg})=>{const c=new pg.Client({connectionString:process.env.DATABASE_URL}); await c.connect(); try { await c.query('DROP SCHEMA public CASCADE'); await c.query('CREATE SCHEMA public'); await c.query('GRANT ALL ON SCHEMA public TO PUBLIC'); console.log('public schema dropped + recreated'); } finally { await c.end(); }});"
+    if ($LASTEXITCODE -ne 0) {
+        throw "DROP SCHEMA public CASCADE failed. Inspect DATABASE_URL and connectivity."
+    }
 }
 
 Write-Host "Applying schema migrations 0000-0007..." -ForegroundColor Cyan
