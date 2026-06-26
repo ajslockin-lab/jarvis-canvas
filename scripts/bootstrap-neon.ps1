@@ -68,8 +68,6 @@ foreach ($m in @(
         $sql += (Get-Content $p -Raw)
     }
 }
-$combined = Join-String $sql ";</-->"   # noqa: PS doesn't need this; pivoted below
-# PS Join-String isn't on 5.1; use -join with separator
 $combined = ($sql -join "
 -- =============================================================
 -- next migration
