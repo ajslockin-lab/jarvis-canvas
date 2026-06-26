@@ -1,0 +1,61 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Cancel in-progress on same-branch pushes to avoid waste when a new commit
+# arrives during a run.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: typecheck + test + build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+          version: 9.15.0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      # Freeze the lockfile. A PR that updates pnpm-lock.yaml needs an
+      # explicit `pnpm install` + lockfile commit; CI won't auto-update.
+      - name: Install deps
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      # vitest runs the api-server unit suite. Other surfaces have no
+      # automated tests today; coverage will expand as we add them.
+      - name: Test
+        run: pnpm test
+        env:
+          # Tests need an ENCRYPTION_KEY; the .env.example value is fine.
+          ENCRYPTION_KEY: "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2"
+          NODE_ENV: test
+
+      - name: Build api
+        run: pnpm --filter @workspace/api-server run build
+
+      - name: Build web
+        run: pnpm --filter @workspace/jarvis-canvas run build
+
+      - name: Format check
+        run: pnpm format:check

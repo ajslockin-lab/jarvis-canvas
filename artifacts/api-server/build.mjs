@@ -101,7 +101,10 @@ async function buildAll() {
       "puppeteer-core",
       "electron",
     ],
-    sourcemap: process.env["NODE_ENV"] === "production" ? false : "linked",
+    // External .map.js files. Lets prod crash reports point back to source.
+    // The esbuild default omits `sourcesContent` from the map, so we don't
+    // accidentally ship the original TS into the bundle directory.
+    sourcemap: "external",
     plugins: [
       // pino relies on workers to handle logging, instead of externalizing it we use a plugin to handle it
       esbuildPluginPino({ transports: ["pino-pretty"] })

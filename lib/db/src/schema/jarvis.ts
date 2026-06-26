@@ -60,6 +60,19 @@ export const emailVerificationsTable = pgTable("email_verifications", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
+// Password reset codes: same shape as email_verifications, but isolated so the
+// two flows can't accidentally cross-consume a code (e.g. a user pasting a
+// signup code into the reset form). Cascade-deletes with the user.
+export const passwordResetsTable = pgTable("password_resets", {
+  id: text("id").primaryKey(),
+  userId: text("user_id").notNull().references(() => usersTable.id, { onDelete: "cascade" }),
+  codeHash: text("code_hash").notNull(),
+  expiresAt: timestamp("expires_at").notNull(),
+  attempts: integer("attempts").notNull().default(0),
+  consumedAt: timestamp("consumed_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
 export const coursesTable = pgTable("courses", {
   id: text("id").primaryKey(),
   userId: text("user_id").notNull().references(() => usersTable.id, { onDelete: "cascade" }),
@@ -100,12 +113,37 @@ export const remindersTable = pgTable("reminders", {
   type: text("type").notNull().default("custom"),
   triggeredAt: timestamp("triggered_at").notNull(),
   active: boolean("active").notNull().default(true),
+  // Optional display fields so the push notification and dashboard UI can show
+  // something meaningful. When tied to an assignment, routes/reminders.ts
+  // enriches these from assignment data; otherwise callers provide them directly.
+  title: text("title"),
+  body: text("body"),
+  url: text("url"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+// Chat sessions group a thread of conversation rows under one bucket so the
+// frontend can show a session sidebar (Phase 1 chat UI). Capped at 5 per user —
+// enforced at the API layer in routes/chat.ts, not in the schema, so the cap can
+// change without a migration. Cascade-deletes with the user and on session delete
+// (conversations.sessionId ON DELETE CASCADE).
+export const chatSessionsTable = pgTable("chat_sessions", {
+  id: text("id").primaryKey(),
+  userId: text("user_id").notNull().references(() => usersTable.id, { onDelete: "cascade" }),
+  // Auto-generated from the first user message via a fast Groq call
+  // ("what's due this week?" → "This Week's Deadlines"). Nullable until the
+  // first message is processed; the chat UI shows "New chat" as a fallback.
+  title: text("title"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 
 export const conversationsTable = pgTable("conversations", {
   id: serial("id").primaryKey(),
   userId: text("user_id").notNull().references(() => usersTable.id, { onDelete: "cascade" }),
+  // Optional session grouping. Null keeps legacy rows readable; new rows always
+  // carry a sessionId. Cascade-delete with the session keeps history clean.
+  sessionId: text("session_id").references(() => chatSessionsTable.id, { onDelete: "cascade" }),
   role: text("role").notNull(),
   message: text("message").notNull(),
   intent: text("intent"),
@@ -128,6 +166,46 @@ export const activationEventsTable = pgTable("activation_events", {
   // event types: first_sync_completed | first_question_asked | first_voice_used
   eventType: text("event_type").notNull(),
   occurredAt: timestamp("occurred_at").notNull().defaultNow(),
+});
+
+// User-side notes (Phase 4). Single flat list per user, no tagging/pinning/
+// markdown — the LLM already does smart formatting in chat, and per-note
+// metadata is the kind of friction that quietly rots over time. CASCADE on
+// user_id mirrors the rest of the schema (account delete wipes everything).
+export const notesTable = pgTable("notes", {
+  id: text("id").primaryKey(),
+  userId: text("user_id").notNull().references(() => usersTable.id, { onDelete: "cascade" }),
+  // One-shot body. No edits because edits invite "did I really write this?"
+  // anxiety and double entries; deleting + recreating is fine for short
+  // copy, the typical use case here.
+  body: text("body").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+// Calendar events mirror Canvas's published iCal feed
+// (`/icalendar?token=<PAT>`). They're cached locally and refreshed by
+// lib/sync-scheduler.ts so /calendar_query and chat answers can be
+// served without hitting Canvas on every request.
+//
+// (userId, sourceId) carries the unique constraint via a SQL index in
+// 0006_calendar_events.sql — drizzle's `.unique()` shorthand can't span
+// the composite primary key without making sourceId the PK itself, which
+// would force a deterministic hash that we don't want to require.
+export const calendarEventsTable = pgTable("calendar_events", {
+  id: text("id").primaryKey(),
+  userId: text("user_id").notNull().references(() => usersTable.id, { onDelete: "cascade" }),
+  // VEVENT UID from Canvas. Composite unique key (userId, sourceId) lives
+  // in the migration so re-syncs diff by UID without having to JOIN.
+  sourceId: text("source_id").notNull(),
+  summary: text("summary"),
+  description: text("description"),
+  location: text("location"),
+  // Canvas publishes in UTC (TZID=Z). Forcing `notNull()` is fine; the
+  // sync-failure path stores nothing rather than half a row.
+  startAt: timestamp("start_at").notNull(),
+  endAt: timestamp("end_at"),
+  lastSyncedAt: timestamp("last_synced_at").notNull().defaultNow(),
 });
 
 // Web-push subscription store. One row per (user, endpoint) — the endpoint
@@ -169,6 +247,11 @@ export const insertEmailVerificationSchema = createInsertSchema(emailVerificatio
   attempts: true,
   consumedAt: true,
 });
+export const insertChatSessionSchema = createInsertSchema(chatSessionsTable).omit({
+  createdAt: true,
+  updatedAt: true,
+  title: true,
+});
 
 export type User = typeof usersTable.$inferSelect;
 export type Course = typeof coursesTable.$inferSelect;
@@ -178,7 +261,11 @@ export type Reminder = typeof remindersTable.$inferSelect;
 export type Conversation = typeof conversationsTable.$inferSelect;
 export type ActivationEvent = typeof activationEventsTable.$inferSelect;
 export type EmailVerification = typeof emailVerificationsTable.$inferSelect;
+export type PasswordReset = typeof passwordResetsTable.$inferSelect;
 export type PushSubscription = typeof pushSubscriptionsTable.$inferSelect;
+export type ChatSession = typeof chatSessionsTable.$inferSelect;
+export type CalendarEvent = typeof calendarEventsTable.$inferSelect;
+export type Note = typeof notesTable.$inferSelect;
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type InsertCourse = z.infer<typeof insertCourseSchema>;
@@ -187,3 +274,4 @@ export type InsertGrade = z.infer<typeof insertGradeSchema>;
 export type InsertReminder = z.infer<typeof insertReminderSchema>;
 export type InsertConversation = z.infer<typeof insertConversationSchema>;
 export type InsertEmailVerification = z.infer<typeof insertEmailVerificationSchema>;
+export type InsertChatSession = z.infer<typeof insertChatSessionSchema>;

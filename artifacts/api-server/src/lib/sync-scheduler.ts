@@ -144,6 +144,18 @@ async function syncUser(user: { id: string; canvasBaseUrl: string; canvasUserId:
       }
     }
 
+    // ── Calendar (Phase 2 / Tier 0) ──
+    // Last phase. Wrapped in its own try/catch so a misbehaving iCal feed
+    // never blocks `done` — courses/assignments/grades are already landed
+    // and the scheduler will retry on the next 15-min tick.
+    await db.update(usersTable).set({ lastSyncPhase: "calendar", updatedAt: new Date() }).where(eq(usersTable.id, user.id));
+    try {
+      const { syncUserCalendar } = await import("./calendar-sync.js");
+      await syncUserCalendar({ id: user.id, canvasBaseUrl: canvasBase }, token);
+    } catch (err) {
+      logger.warn({ userId: user.id, err }, "Background sync: calendar sync failed (non-fatal)");
+    }
+
     // Done
     await db.update(usersTable).set({ lastSyncPhase: "done", lastSyncError: null, updatedAt: new Date() }).where(eq(usersTable.id, user.id));
     logger.info({ userId: user.id }, "Background sync completed");
@@ -179,8 +191,17 @@ async function tick() {
 
     if (staleUsers.length === 0) return;
 
-    logger.info({ count: staleUsers.length }, "Background sync tick: syncing stale users");
-    await Promise.allSettled(staleUsers.map((u) => syncUser(u)));
+    // `usersTable.canvasBaseUrl` is nullable; this scheduler only knows how to
+    // sync Canvas-authenticated users, so drop the null-baseUrl rows before
+    // mapping. (PAT-only users without a school URL can't be re-synced; that's
+    // expected and handled elsewhere in the auth flow.)
+    const syncableUsers = staleUsers.filter(
+      (u): u is typeof u & { canvasBaseUrl: string } => u.canvasBaseUrl !== null,
+    );
+    if (syncableUsers.length === 0) return;
+
+    logger.info({ count: syncableUsers.length }, "Background sync tick: syncing stale users");
+    await Promise.allSettled(syncableUsers.map((u) => syncUser(u)));
   } catch (err) {
     logger.error({ err }, "Background sync tick error");
   }

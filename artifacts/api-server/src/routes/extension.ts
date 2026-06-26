@@ -28,7 +28,11 @@ router.get("/extension/download", async (req, res) => {
   if (!user) return;
 
   try {
-    const extDir = join(process.cwd(), "artifacts", "chrome-extension");
+    // In prod, allow overriding the extension directory via EXTENSION_DIR env var.
+    // On hosts like Render, the default path (process.cwd()/artifacts/chrome-extension)
+    // works as long as the chrome-extension files are in the repo. If they're not
+    // (e.g. a lean Docker image), set EXTENSION_DIR to the right location.
+    const extDir = process.env["EXTENSION_DIR"] || join(process.cwd(), "artifacts", "chrome-extension");
 
     // Collect only allowlisted files
     const files: { name: string; data: Buffer }[] = [];
@@ -42,6 +46,17 @@ router.get("/extension/download", async (req, res) => {
         // icons that haven't been created yet
         console.warn(`Extension download: skipped missing file ${name}`);
       }
+    }
+
+    // If no files were found, the extension directory likely doesn't exist
+    // (e.g. on a lean Docker image or Render without the chrome-extension files).
+    // Return a clear error instead of building an empty ZIP.
+    if (files.length === 0) {
+      res.status(404).json({
+        error: "Extension files not found on this server. Set EXTENSION_DIR if deploying from a monorepo.",
+        code: "extension_not_found",
+      });
+      return;
     }
 
     // Build a ZIP in memory (stored, no compression — small files so size doesn't matter)

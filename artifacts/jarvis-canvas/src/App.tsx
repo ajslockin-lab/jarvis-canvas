@@ -10,7 +10,9 @@ import SettingsPage from "@/pages/SettingsPage";
 import ExtensionPage from "@/pages/ExtensionPage";
 import ExtensionIframePage from "@/pages/ExtensionIframePage";
 import ForgotPasswordPage from "@/pages/ForgotPasswordPage";
+import ChatPage from "@/pages/ChatPage";
 import NotFound from "@/pages/not-found";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 const queryClient = new QueryClient();
 
@@ -25,20 +27,27 @@ function Router() {
       <Route path="/forgot-password" component={ForgotPasswordPage} />
       <Route path="/dashboard" component={DashboardPage} />
       <Route path="/settings" component={SettingsPage} />
+      <Route path="/chat" component={ChatPage} />
       <Route path="/extension" component={ExtensionPage} />
       <Route path="/extension/iframe" component={ExtensionIframePage} />
       <Route component={NotFound} />
-    </Switch>
+</Switch>
   );
 }
 
 function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-        <Router />
-      </WouterRouter>
-    </QueryClientProvider>
+    // ErrorBoundary wraps Router (not QueryClient) so a thrown render
+    // anywhere in the page tree gets caught and the global providers
+    // stay mounted. Important: keep the boundary between providers
+    // and the page tree at this level.
+    <ErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
+          <Router />
+  </WouterRouter>
+ </QueryClientProvider>
+</ErrorBoundary>
   );
 }
 

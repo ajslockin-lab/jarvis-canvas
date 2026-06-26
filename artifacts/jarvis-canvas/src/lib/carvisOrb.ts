@@ -4,6 +4,10 @@
  */
 
 import * as THREE from "three";
+import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer.js";
+import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
+import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPass.js";
+import { OutputPass } from "three/examples/jsm/postprocessing/OutputPass.js";
 
 export type OrbState = "idle" | "listening" | "thinking" | "speaking";
 
@@ -38,9 +42,24 @@ export function createOrb(canvas: HTMLCanvasElement): Orb {
     }
   });
 
-  const scene = new THREE.Scene();
-  const camera = new THREE.PerspectiveCamera(45, canvas.clientWidth / canvas.clientHeight, 1, 1000);
-  camera.position.z = 80;
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(45, canvas.clientWidth / canvas.clientHeight, 1, 1000);
+camera.position.z = 80;
+
+// Post-processing — UnrealBloomPass adds the soft additive glow that turns
+// the additive-blended additive particles into a true energy orb instead of
+// a flat texture. EffectComposer routing: scene → bloom → output (the
+// OutputPass is required since three r152 to do tone-mapping/color-space
+// conversion correctly). sizing mirrors the renderer so resize stays clean.
+const composer = new EffectComposer(renderer);
+composer.addPass(new RenderPass(scene, camera));
+composer.addPass(new UnrealBloomPass(
+  new THREE.Vector2(canvas.clientWidth, canvas.clientHeight),
+  0.65, // strength
+  0.7,  // radius
+  0.05, // threshold (skip the dark; only the bright bits glow)
+));
+composer.addPass(new OutputPass());
 
   const geo = new THREE.BufferGeometry();
   const pos = new Float32Array(N * 3);
@@ -60,7 +79,7 @@ export function createOrb(canvas: HTMLCanvasElement): Orb {
   geo.setAttribute("position", new THREE.BufferAttribute(pos, 3));
 
   const mat = new THREE.PointsMaterial({
-    color: 0xff1e1e,
+    color: 0xdc2626,
     size: 0.4,
     transparent: true,
     opacity: 0.6,
@@ -152,7 +171,7 @@ export function createOrb(canvas: HTMLCanvasElement): Orb {
   let bass = 0;
   let mid = 0;
 
-  const idleColor = new THREE.Color(0xff1e1e);
+  const idleColor = new THREE.Color(0xdc2626);
 const thinkingColor = new THREE.Color(0xff4444);
 const speakingColor = new THREE.Color(0xff6b3d);
 const idleLineColor = new THREE.Color(0x8b0000);
@@ -403,7 +422,10 @@ const clock = new THREE.Clock();
     camera.position.y = Math.cos(t * 0.03) * 3;
     camera.lookAt(0, 0, cloudZ * 0.2);
 
-    renderer.render(scene, camera);
+    // Route through the bloom composer — particle additivity + bloom = the
+    // "energy orb" feel; rendering directly through WebGLRenderer bypasses
+    // the entire post pipeline.
+    composer.render();
   }
 
   function onResize() {
@@ -412,6 +434,7 @@ const clock = new THREE.Clock();
     camera.aspect = w / h;
     camera.updateProjectionMatrix();
     renderer.setSize(w, h);
+    composer.setSize(w, h);
   }
 
   const resizeObserver = new ResizeObserver(onResize);
@@ -440,7 +463,10 @@ const clock = new THREE.Clock();
       mat.dispose();
       lineMat.dispose();
       electronMat.dispose();
-      renderer.dispose();
-    },
-  };
+    renderer.dispose();
+    // dispose bloom + composer last so the dispose order mirrors add order
+    composer.passes.forEach((p) => p.dispose?.());
+    composer.dispose();
+  },
+};
 }

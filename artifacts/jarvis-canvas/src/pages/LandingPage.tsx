@@ -80,7 +80,7 @@ export default function LandingPage() {
       {menuOpen && (
         <div className="fixed inset-0 z-[60] bg-[#060911]/98 backdrop-blur-xl md:hidden p-8 pt-20">
           <button className="absolute top-4 right-4 text-white/50" onClick={() => setMenuOpen(false)}>
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y1="18" /><line x1="6" y1="6" x2="18" y1="18" /></svg>
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
          </button>
           <div className="flex flex-col gap-6">
             <a href="#demo" onClick={() => setMenuOpen(false)} className="text-xl text-slate-300 hover:text-white transition">Demo</a>

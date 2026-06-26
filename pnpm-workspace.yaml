@@ -71,6 +71,7 @@ autoInstallPeers: false
 onlyBuiltDependencies:
   - '@swc/core'
   - '@embedded-postgres/windows-x64'
+  - '@embedded-postgres/linux-x64'
   - esbuild
   - msw
   - unrs-resolver
