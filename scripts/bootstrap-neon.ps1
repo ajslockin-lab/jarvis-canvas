@@ -61,7 +61,8 @@ foreach ($m in @(
     "0004_add_password_and_verification.sql",
     "0005_security_hardening.sql",
     "0006_calendar_events.sql",
-    "0007_notes.sql"
+    "0007_notes.sql",
+    "0008_password_resets.sql"
 )) {
     $p = "lib/db/drizzle/$m"
     if (Test-Path $p) {
