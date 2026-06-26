@@ -104,10 +104,6 @@ DROP TRIGGER IF EXISTS sessions_audit ON sessions;
 CREATE TRIGGER sessions_audit AFTER INSERT OR DELETE ON sessions
   FOR EACH ROW EXECUTE FUNCTION audit_row_change();
 
-DROP TRIGGER IF EXISTS password_resets_audit ON password_resets;
-CREATE TRIGGER password_resets_audit AFTER INSERT OR UPDATE ON password_resets
-  FOR EACH ROW EXECUTE FUNCTION audit_row_change();
-
 DROP TRIGGER IF EXISTS reminders_audit ON reminders;
 CREATE TRIGGER reminders_audit AFTER INSERT OR UPDATE OR DELETE ON reminders
   FOR EACH ROW EXECUTE FUNCTION audit_row_change();
