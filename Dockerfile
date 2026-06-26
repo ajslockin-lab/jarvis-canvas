@@ -87,9 +87,11 @@ COPY --from=build /repo/artifacts/api-server/dist ./artifacts/api-server/dist
 COPY artifacts/chrome-extension ./artifacts/chrome-extension
 
 # Healthcheck uses a tiny node script — no shell / curl / wget needed.
-# Override at deploy time with -e HEALTHCHECK_URL=http://localhost:8080/api/healthz
+# HEALTHCHECK_URL defaults to whatever PORT the api-server binds to;
+# override via env if the platform routes through a different port.
 COPY <<'EOF' /usr/local/bin/healthcheck.mjs
-const url = process.env.HEALTHCHECK_URL || "http://127.0.0.1:8080/api/healthz";
+const port = process.env.PORT || "8080";
+const url = process.env.HEALTHCHECK_URL || `http://127.0.0.1:${port}/api/healthz`;
 const timeoutMs = Number(process.env.HEALTHCHECK_TIMEOUT_MS || 2000);
 
 const ctl = new AbortController();
@@ -107,6 +109,8 @@ EOF
 
 USER carvis
 
+# EXPOSE is informational — actual bind port comes from $PORT at runtime
+# (Render/HF Spaces/Fly/Railway all inject PORT into the env).
 EXPOSE 8080
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
