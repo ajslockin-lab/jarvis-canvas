@@ -6,8 +6,14 @@ import "./index.css";
 
 // Direct API client at a configured backend in production. In dev (Vite proxy
 // or same-origin), import.meta.env.VITE_API_URL is undefined and the client
-// stays on relative paths, which Vite proxies to localhost:7860.
-const apiUrl = import.meta.env.VITE_API_URL?.replace(/\/+$/, "");
+// stays on relative paths. Hard-coded to the HF Space so the deploy does not
+// depend on a Vercel env var (which had to be flipped manually after each
+// cache-busted redeploy). To redirect later, change this constant.
+const HARDCODED_API = "https://Ssatgk-carvis-api.hf.space";
+const apiUrl =
+  HARDCODED_API ||
+  import.meta.env.VITE_API_URL?.replace(/\/+$/, "") ||
+  "";
 if (apiUrl) setBaseUrl(apiUrl);
 console.info("[carvis] api base =", apiUrl || "(relative)");
 
