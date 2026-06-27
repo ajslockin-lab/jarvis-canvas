@@ -12,6 +12,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Loader2, AlertCircle, Mail, ArrowLeft } from "lucide-react";
 import { Link, useLocation } from "wouter";
+import { apiUrl } from "../lib/api-base";
 
 type VerifyError =
   | { kind: "invalid_code" }
@@ -61,7 +62,7 @@ export default function VerifyEmailPage() {
     setStage("verifying");
     setError(null);
     try {
-      const res = await fetch("/api/auth/verify-email", {
+      const res = await fetch(apiUrl("/api/auth/verify-email"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
@@ -148,7 +149,7 @@ export default function VerifyEmailPage() {
     setStage("resending");
     setError(null);
     try {
-      const res = await fetch("/api/auth/resend-code", {
+      const res = await fetch(apiUrl("/api/auth/resend-code"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",

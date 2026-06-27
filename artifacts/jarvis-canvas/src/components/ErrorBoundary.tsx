@@ -1,4 +1,5 @@
 import { Component, type ReactNode, type ErrorInfo } from "react";
+import { apiUrl } from "@/lib/api-base";
 
 interface ErrorBoundaryProps {
   children: ReactNode;
@@ -34,7 +35,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
     // Fire-and-forget reporter; the server-side pino log is the
     // ground truth for prod crash visibility.
     try {
-      void fetch("/api/errors", {
+      void fetch(apiUrl("/api/errors"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
