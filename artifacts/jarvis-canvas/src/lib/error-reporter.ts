@@ -3,7 +3,7 @@
 // POSTs them to /api/errors so they show up in the server's pino logs.
 // This gives us visibility into browser crashes we'd otherwise never see.
 
-const API_BASE = import.meta.env.VITE_API_URL || "";
+const API_BASE = import.meta.env.VITE_API_URL?.replace(/\/+$/, "") || "";
 
 async function reportError(payload: {
   message: string;
