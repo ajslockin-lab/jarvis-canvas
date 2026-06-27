@@ -61,7 +61,7 @@ export default function FirstRunNudge({
     const alreadyFired = window.localStorage.getItem(`${flagKey}__first_question_asked`) === "1";
     if (alreadyFired) return;
     window.localStorage.setItem(`${flagKey}__first_question_asked`, "1");
-    void fetch("/api/canvas/activation", {
+    void fetch(apiUrl("/api/canvas/activation"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "include",

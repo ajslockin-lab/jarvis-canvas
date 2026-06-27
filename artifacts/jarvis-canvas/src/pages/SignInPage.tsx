@@ -13,6 +13,7 @@
 import { useState, useEffect } from "react";
 import { ArrowRight, Loader2, Shield, AlertCircle, Eye, EyeOff, Users } from "lucide-react";
 import { Link, useLocation } from "wouter";
+import { apiUrl } from "../lib/api-base";
 import { pushRecentAccount, readRecentAccounts, removeRecentAccount, type RecentAccount } from "@/lib/recent-accounts";
 
 // Match the server's ErrorCodes enum in routes/auth.ts. Frontend uses these
@@ -49,7 +50,7 @@ export default function SignInPage() {
   // no session and we render the form normally.
   useEffect(() => {
     let cancelled = false;
-    fetch("/api/user/data", { credentials: "include" })
+    fetch(apiUrl("/api/user/data"), { credentials: "include" })
       .then((res) => {
         if (cancelled) return;
         if (res.ok) {
@@ -92,7 +93,7 @@ export default function SignInPage() {
     setStage("signing_in");
 
     try {
-      const res = await fetch("/api/auth/signin", {
+      const res = await fetch(apiUrl("/api/auth/signin"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
@@ -159,7 +160,7 @@ export default function SignInPage() {
     setError(null);
     setStage("switching");
     try {
-      const res = await fetch("/api/auth/switch-account", {
+      const res = await fetch(apiUrl("/api/auth/switch-account"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",

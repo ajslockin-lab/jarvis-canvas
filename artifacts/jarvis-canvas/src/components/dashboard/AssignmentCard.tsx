@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { ExternalLink, Check } from "lucide-react";
+import { apiUrl } from "@/lib/api-base";
 
 interface AssignmentCardProps {
   id?: string;
@@ -42,7 +43,7 @@ export default function AssignmentCard({
     const prevCompleted = isCompleted;
     setIsCompleted(!prevCompleted);
     try {
-      const res = await fetch(`/api/canvas/assignments/${encodeURIComponent(id)}/complete`, {
+      const res = await fetch(apiUrl(`/api/canvas/assignments/${encodeURIComponent(id)}/complete`), {
         method: "PATCH",
         credentials: "include",
       });

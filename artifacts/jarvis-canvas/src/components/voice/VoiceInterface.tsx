@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Volume2, VolumeX, X, Mic, Send, Loader2 } from "lucide-react";
 import CarvisOrb from "./CarvisOrb";
 import type { OrbState } from "@/lib/carvisOrb";
+import { apiUrl } from "@/lib/api-base";
 
 interface VoiceInterfaceProps {
   isOpen: boolean;
@@ -265,7 +266,7 @@ export default function VoiceInterface({
       onFirstSubmit?.();
     }
     try {
-      const res = await fetch("/api/voice/command", {
+      const res = await fetch(apiUrl("/api/voice/command"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",

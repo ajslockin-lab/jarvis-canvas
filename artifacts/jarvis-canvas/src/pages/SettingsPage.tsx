@@ -14,6 +14,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { clearRecentAccounts } from "@/lib/recent-accounts";
+import { apiUrl } from "../lib/api-base";
 
 export default function SettingsPage() {
   const [, navigate] = useLocation();
@@ -41,7 +42,7 @@ export default function SettingsPage() {
   const [pushError, setPushError] = useState<string | null>(null);
 
   useEffect(() => {
-    fetch("/api/user/data", { credentials: "include" })
+    fetch(apiUrl("/api/user/data"), { credentials: "include" })
       .then((r) => r.json())
       .then((data) => {
         setCanvasConnected(!!data.user?.canvasBaseUrl);
@@ -58,7 +59,7 @@ export default function SettingsPage() {
     setSyncing(true);
     setSyncResult(null);
     try {
-      const res = await fetch("/api/canvas/sync", { method: "POST", credentials: "include" });
+      const res = await fetch(apiUrl("/api/canvas/sync"), { method: "POST", credentials: "include" });
       const data = await res.json();
       if (data.success) {
         setSyncResult(`Synced ${data.courseCount} courses!`);
@@ -102,7 +103,7 @@ export default function SettingsPage() {
     if (signingOut) return;
     setSigningOut(true);
     try {
-      await fetch("/api/auth/signout", { method: "POST", credentials: "include" });
+      await fetch(apiUrl("/api/auth/signout"), { method: "POST", credentials: "include" });
     } catch {
       // Best-effort — we still navigate even if the request fails.
     }
@@ -136,7 +137,7 @@ export default function SettingsPage() {
     setDeleting(true);
     setDeleteError(null);
     try {
-      const res = await fetch("/api/auth/delete-account", {
+      const res = await fetch(apiUrl("/api/auth/delete-account"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",

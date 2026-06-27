@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { Bell, X, Clock, AlertTriangle, Zap, Sparkles } from "lucide-react";
+import { apiUrl } from "@/lib/api-base";
 
 interface ProactiveAlert {
   id: string;
@@ -126,7 +127,7 @@ export default function ProactiveFeed({
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch("/api/user/data", { credentials: "include" })
+    fetch(apiUrl("/api/user/data"), { credentials: "include" })
       .then((r) => r.json())
       .then((data) => {
         const courses = Array.isArray(data.courses) ? data.courses : [];

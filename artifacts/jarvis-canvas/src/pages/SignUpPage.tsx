@@ -8,6 +8,7 @@
 import { useState } from "react";
 import { ArrowRight, Loader2, Shield, AlertCircle, CheckCircle2 } from "lucide-react";
 import { Link, useLocation } from "wouter";
+import { apiUrl } from "../lib/api-base";
 
 type SignUpError =
   | { kind: "email_taken" }
@@ -58,7 +59,7 @@ export default function SignUpPage() {
     setStage("creating");
 
     try {
-      const res = await fetch("/api/auth/signup", {
+      const res = await fetch(apiUrl("/api/auth/signup"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",

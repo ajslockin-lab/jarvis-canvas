@@ -13,6 +13,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { ArrowRight, Loader2, Shield, AlertCircle, Eye, EyeOff, RefreshCw, ExternalLink, CheckCircle2 } from "lucide-react";
 import { useLocation } from "wouter";
+import { apiUrl } from "../lib/api-base";
 
 // Normalize user input: add https:// if they forgot it.
 function normalizeUrl(raw: string): string {
@@ -68,7 +69,7 @@ export default function OnboardingCanvasPage() {
   // If they're not authed at all, send them to /signin.
   useEffect(() => {
     let cancelled = false;
-    fetch("/api/user/data", { credentials: "include" })
+    fetch(apiUrl("/api/user/data"), { credentials: "include" })
       .then((res) => {
         if (cancelled) return;
         if (res.status === 401) {
@@ -121,7 +122,7 @@ export default function OnboardingCanvasPage() {
     setStage("verifying_token");
 
     try {
-      const res = await fetch("/api/auth/canvas/pat", {
+      const res = await fetch(apiUrl("/api/auth/canvas/pat"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
@@ -178,7 +179,7 @@ export default function OnboardingCanvasPage() {
     setOauthStatus("redirecting");
 
     try {
-      const res = await fetch("/api/auth/canvas/start", {
+      const res = await fetch(apiUrl("/api/auth/canvas/start"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",

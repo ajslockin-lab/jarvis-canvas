@@ -14,6 +14,7 @@
 import { useState, useEffect, useRef } from "react";
 import { Loader2, AlertCircle, Mail, ArrowLeft, KeyRound, Eye, EyeOff, Check } from "lucide-react";
 import { Link, useLocation } from "wouter";
+import { apiUrl } from "../lib/api-base";
 
 type Stage = "request_email" | "enter_code" | "done";
 
@@ -72,7 +73,7 @@ export default function ForgotPasswordPage() {
     setRequestError(null);
     setRequestStage(isResend ? "resending" : "requesting");
     try {
-      const res = await fetch("/api/auth/request-password-reset", {
+      const res = await fetch(apiUrl("/api/auth/request-password-reset"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: email.trim() }),
@@ -122,7 +123,7 @@ export default function ForgotPasswordPage() {
     setResetError(null);
     setResetStage("submitting");
     try {
-      const res = await fetch("/api/auth/perform-password-reset", {
+      const res = await fetch(apiUrl("/api/auth/perform-password-reset"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userId, code: fullCode, newPassword }),

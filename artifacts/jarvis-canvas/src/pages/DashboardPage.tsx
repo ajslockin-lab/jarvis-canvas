@@ -51,6 +51,7 @@ import {
 } from "@/components/dashboard/SkeletonCard";
 import { useFirstRunState } from "@/lib/useFirstRunState";
 import { Link, useLocation } from "wouter";
+import { apiUrl } from "@/lib/api-base";
 
 interface Course {
   id: string;
@@ -111,7 +112,7 @@ export default function DashboardPage() {
   // server populates data we then need to re-read here).
   const fetchData = async () => {
     try {
-      const res = await fetch("/api/user/data", { credentials: "include" });
+      const res = await fetch(apiUrl("/api/user/data"), { credentials: "include" });
       const data: UserDataResponse = await res.json();
       const syncedCourses = Array.isArray(data.courses) ? data.courses : [];
       setCourses(syncedCourses);
@@ -124,7 +125,7 @@ export default function DashboardPage() {
         if (latestSync) setLastSync(new Date(latestSync).toISOString());
       }
       try {
-        const gradesRes = await fetch("/api/canvas/grades", { credentials: "include" });
+        const gradesRes = await fetch(apiUrl("/api/canvas/grades"), { credentials: "include" });
         const gradesData = await gradesRes.json();
         if (Array.isArray(gradesData.grades)) {
           setGrades(
@@ -153,7 +154,7 @@ export default function DashboardPage() {
     setSyncError(null);
     setPartialError(null);
     try {
-      const res = await fetch("/api/canvas/sync", {
+      const res = await fetch(apiUrl("/api/canvas/sync"), {
         method: "POST",
         credentials: "include",
       });
@@ -181,7 +182,7 @@ export default function DashboardPage() {
     if (signingOut) return;
     setSigningOut(true);
     try {
-      await fetch("/api/auth/signout", {
+      await fetch(apiUrl("/api/auth/signout"), {
         method: "POST",
         credentials: "include",
       });
@@ -204,7 +205,7 @@ export default function DashboardPage() {
     const flag = `carvis_first_sync_completed_fired`;
     if (window.localStorage.getItem(flag) === "1") return;
     window.localStorage.setItem(flag, "1");
-    void fetch("/api/canvas/activation", {
+    void fetch(apiUrl("/api/canvas/activation"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
@@ -222,7 +223,7 @@ export default function DashboardPage() {
 
     const pollSyncStatus = async () => {
       try {
-        const res = await fetch("/api/canvas/sync-status", { credentials: "include" });
+        const res = await fetch(apiUrl("/api/canvas/sync-status"), { credentials: "include" });
         if (cancelled) return;
         const data = (await res.json()) as SyncStatusResponse;
         const phase: SyncPhase = data.phase ?? "idle";
@@ -275,7 +276,7 @@ export default function DashboardPage() {
       // Read the current phase once. If lastSyncPhase is null AND we have
       // a canvasBaseUrl (i.e. the user has connected Canvas), fire sync.
       try {
-        const res = await fetch("/api/canvas/sync-status", { credentials: "include" });
+        const res = await fetch(apiUrl("/api/canvas/sync-status"), { credentials: "include" });
         const data = (await res.json()) as SyncStatusResponse;
         if (cancelled) return;
         setCanvasConnected(Boolean(data.canvasBaseUrl));
@@ -287,7 +288,7 @@ export default function DashboardPage() {
           setAutoSyncTriggered(true);
           setSyncPhase("courses");
           // Don't await — the polling effect will pick up the new phase.
-          void fetch("/api/canvas/sync", {
+          void fetch(apiUrl("/api/canvas/sync"), {
             method: "POST",
             credentials: "include",
           }).catch(() => {
@@ -333,7 +334,7 @@ export default function DashboardPage() {
     const flag = `carvis_first_question_asked_fired_${userId ?? "anon"}`;
     if (window.localStorage.getItem(flag) === "1") return;
     window.localStorage.setItem(flag, "1");
-    void fetch("/api/canvas/activation", {
+    void fetch(apiUrl("/api/canvas/activation"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "include",

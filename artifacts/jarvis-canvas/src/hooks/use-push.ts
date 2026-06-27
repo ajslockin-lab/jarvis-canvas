@@ -1,15 +1,5 @@
 // usePush — manages web-push subscription state for the current user.
 //
-// Lifecycle:
-//   1. On mount, fetch the VAPID public key from /api/push/vapid-public-key.
-//      If it's null, the server hasn't been configured for push (VAPID_* env
-//      vars unset) — we report "unsupported" and the Settings UI hides
-//      the opt-in toggle entirely.
-//   2. If Notification.permission is "default", show the opt-in button.
-//   3. On opt-in, subscribe via serviceWorker.pushManager, POST the
-//      subscription to /api/push/subscribe.
-//   4. On denial or later unsubscribe, DELETE the subscription.
-//
 // The hook deliberately does NOT store the subscription in state — it's
 // owned by the service worker. State here is just the permission level
 // and whether the user is currently opted-in (derived from a boolean
@@ -17,6 +7,7 @@
 // we ever need it — for now we just trust the local permission state).
 
 import { useState, useEffect, useCallback } from "react";
+import { apiUrl } from "@/lib/api-base";
 
 export type PushSupport = "loading" | "unsupported" | "ready";
 export type PushPermission = "default" | "granted" | "denied" | "unsupported";
@@ -69,7 +60,7 @@ export function usePush(): UsePushResult {
       }
 
       try {
-        const res = await fetch("/api/push/vapid-public-key", { credentials: "include" });
+        const res = await fetch(apiUrl("/api/push/vapid-public-key"), { credentials: "include" });
         if (!res.ok) throw new Error("vapid key fetch failed");
         const data = (await res.json()) as { publicKey: string | null };
         if (cancelled) return;
@@ -124,7 +115,7 @@ export function usePush(): UsePushResult {
     }
 
     const json = subscription.toJSON();
-    const res = await fetch("/api/push/subscribe", {
+    const res = await fetch(apiUrl("/api/push/subscribe"), {
       method: "POST",
       credentials: "include",
       headers: { "Content-Type": "application/json" },
@@ -149,7 +140,7 @@ export function usePush(): UsePushResult {
     const unsubscribed = await subscription.unsubscribe();
     if (!unsubscribed) return false;
 
-    await fetch("/api/push/subscribe", {
+    await fetch(apiUrl("/api/push/subscribe"), {
       method: "DELETE",
       credentials: "include",
       headers: { "Content-Type": "application/json" },

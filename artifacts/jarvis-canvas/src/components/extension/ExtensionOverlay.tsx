@@ -2,6 +2,12 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { Mic, X, Sparkles, Loader2, ChevronLeft, ChevronRight, Zap, MousePointer, ArrowDown, ArrowUp, Navigation, Eye, Cpu, Volume2, VolumeX } from "lucide-react";
 
 const SESSION_KEY = "jarvis_session_token";
+function readElement(elementId: string) {
+  postBridge({ type: "jarvis-read-element", elementId });
+}
+function readSelection() {
+  postBridge({ type: "jarvis-read-selection" });
+}
 // API_BASE is empty = relative URLs (same-origin). If API runs on a different domain,
 // set this to the API origin (e.g. "https://api.carvis.app") via env or config.
 const API_BASE = "";
@@ -33,12 +39,20 @@ interface AgentAction {
   direction?: "up" | "down";
   url?: string;
 }
+type AgentAction2 =
+  | { type: "click"; elementId: string }
+  | { type: "fill"; elementId: string; value: string }
+  | { type: "scroll"; direction: "up" | "down" }
+  | { type: "navigate"; url: string }
+  | { type: "keypress"; elementId: string; key: string }
+  | { type: "select"; elementId: string; value: string };
 
 interface AgentPlan {
   response: string;
   action?: AgentAction;
   blocked?: boolean;
 }
+type AgentPlan2 = { response: string; action?: AgentAction2 | AgentAction2[]; blocked?: boolean };
 
 type Tab = "intel" | "agent" | "data";
 
@@ -133,6 +147,25 @@ export default function ExtensionOverlay() {
     const handleMessage = (e: MessageEvent) => {
       if (e.data?.type === "jarvis-context") {
         setPageContext({ url: e.data.url, title: e.data.title, elements: e.data.elements || [] });
+      } else if (e.data?.type === "jarvis-context-delta") {
+        // Parent saw DOM change. Refresh the snapshot so the next agent
+        // command sees the up-to-date view. Cheap — small payload.
+        if (window.parent !== window) {
+          window.parent.postMessage({ type: "jarvis-get-context" }, "*");
+        }
+      } else if (e.data?.type === "jarvis-read-element-result") {
+        // Surface read targets in history so the user sees what the agent inspected.
+        const preview = e.data?.text ? e.data.text.slice(0, 220) : "(empty)";
+        setAgentHistory((h) => [
+          ...h,
+          { role: "jarvis", text: `📄 read element ${e.data.elementId}: ${preview}${e.data?.text && e.data.text.length > 220 ? "…" : ""}`, action: undefined, blocked: false },
+        ]);
+      } else if (e.data?.type === "jarvis-read-selection-result") {
+        const sel = (e.data?.text ?? "").trim();
+        setAgentHistory((h) => [
+          ...h,
+          { role: "jarvis", text: sel ? `📝 selection: "${sel.slice(0, 220)}"` : "(no selection)" },
+        ]);
       }
     };
     window.addEventListener("message", handleMessage);
@@ -229,6 +262,11 @@ export default function ExtensionOverlay() {
       setAgentHistory((h) => [...h, { role: "jarvis", text: data.response, action: data.action, blocked: data.blocked }]);
       speak(data.response);
       if (data.action && !data.blocked) executeAgentAction(data.action);
+      const actions = Array.isArray(data.action) ? data.action : (data.action ? [data.action] : []);
+      for (const a of actions) {
+        if (!a) continue;
+        executeAgentAction(a);
+      }
     } catch {
       const errMsg = "Connection error — CARVIS offline.";
       setAgentHistory((h) => [...h, { role: "jarvis", text: errMsg }]);
