@@ -72,8 +72,8 @@ function sendError(
 function createSessionCookie(res: import("express").Response, sessionId: string) {
   res.cookie("jarvis_session", sessionId, {
     httpOnly: true,
-    sameSite: "lax",
-    secure: process.env["NODE_ENV"] === "production",
+    sameSite: "none",
+    secure: true,
     maxAge: SESSION_TTL_MS,
     path: "/",
   });
@@ -489,8 +489,8 @@ router.post("/auth/canvas/start", async (req, res) => {
       state,
     });
 
-    res.cookie("canvas_oauth_state", state, { httpOnly: true, sameSite: "lax", secure: process.env["NODE_ENV"] === "production", maxAge: 600_000, path: "/" });
-    res.cookie("canvas_oauth_url", canvasUrl, { httpOnly: true, sameSite: "lax", secure: process.env["NODE_ENV"] === "production", maxAge: 600_000, path: "/" });
+    res.cookie("canvas_oauth_state", state, { httpOnly: true, sameSite: "none", secure: true, maxAge: 600_000, path: "/" });
+    res.cookie("canvas_oauth_url", canvasUrl, { httpOnly: true, sameSite: "none", secure: true, maxAge: 600_000, path: "/" });
     res.json({ url: `${canvasUrl}/login/oauth2/auth?${params.toString()}` });
   } catch (err) {
     console.error("Canvas OAuth start error:", err);

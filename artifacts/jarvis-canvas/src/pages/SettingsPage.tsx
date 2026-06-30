@@ -42,9 +42,17 @@ export default function SettingsPage() {
   const [pushError, setPushError] = useState<string | null>(null);
 
   useEffect(() => {
+    let cancelled = false;
     fetch(apiUrl("/api/user/data"), { credentials: "include" })
-      .then((r) => r.json())
+      .then((r) => {
+        if (r.status === 401) {
+          navigate("/signin", { replace: true });
+          throw new Error("Unauthorized");
+        }
+        return r.json();
+      })
       .then((data) => {
+        if (cancelled) return;
         setCanvasConnected(!!data.user?.canvasBaseUrl);
         // The delete-account dialog uses authProvider to decide whether
         // to ask for a password re-prompt.
@@ -52,7 +60,10 @@ export default function SettingsPage() {
           setAuthProvider(data.user.authProvider);
         }
       })
-      .catch(() => setCanvasConnected(false));
+      .catch((err) => {
+        if (err.message !== "Unauthorized") setCanvasConnected(false);
+      });
+    return () => { cancelled = true; };
   }, []);
 
   const handleSync = async () => {

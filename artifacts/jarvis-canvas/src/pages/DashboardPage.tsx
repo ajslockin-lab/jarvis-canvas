@@ -113,6 +113,10 @@ export default function DashboardPage() {
   const fetchData = async () => {
     try {
       const res = await fetch(apiUrl("/api/user/data"), { credentials: "include" });
+      if (res.status === 401) {
+        navigate("/signin", { replace: true });
+        return;
+      }
       const data: UserDataResponse = await res.json();
       const syncedCourses = Array.isArray(data.courses) ? data.courses : [];
       setCourses(syncedCourses);
