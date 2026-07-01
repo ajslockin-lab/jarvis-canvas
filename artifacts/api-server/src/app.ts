@@ -10,6 +10,14 @@ import { logger } from "./lib/logger";
 
 const app: Express = express();
 
+// ponytail: Hugging Face (and Render/Fly) terminate TLS in front of
+// Express, so every request lands with at least one X-Forwarded-* header.
+// Without trust proxy, express-rate-limit throws ERR_ERL_UNEXPECTED_X_FORWARDED_FOR
+// on the first real request and silently degrades to a single shared bucket.
+if (process.env["NODE_ENV"] === "production") {
+  app.set("trust proxy", 1);
+}
+
 app.use(
   pinoHttp({
     logger,
@@ -81,16 +89,30 @@ if (process.env["NODE_ENV"] === "production") {
 }
 
 // CORS — restrict to known origins in production
+// ponytail: hardcode the live web app URLs as a safety net so a missing or
+// stale ALLOWED_ORIGINS on the deployed HF Space does not 403 the production
+// frontend with a generic 'check your internet' fetch failure.
+// ALLOWED_ORIGINS still wins when set; the hardcoded list only fills in when
+// ALLOWED_ORIGINS is unset or empty.
+const STATIC_ALLOWED_ORIGINS = [
+  "https://carvis.vercel.app",
+  "https://www.carvis.app",
+];
+
 const allowedOrigins = process.env["ALLOWED_ORIGINS"]
   ? process.env["ALLOWED_ORIGINS"].split(",").map((s) => s.trim()).filter(Boolean)
   : process.env["NODE_ENV"] === "production"
-    ? [] // Must set ALLOWED_ORIGINS in production
+    ? STATIC_ALLOWED_ORIGINS
     : ["http://localhost:20034", "http://localhost:5173"];
 
-if (process.env["NODE_ENV"] === "production" && allowedOrigins.length === 0) {
-  logger.warn(
-    "ALLOWED_ORIGINS is not set — all cross-origin requests will be rejected. " +
-    "Set ALLOWED_ORIGINS=https://yourdomain.com to allow the frontend.",
+if (
+  process.env["NODE_ENV"] === "production" &&
+  !process.env["ALLOWED_ORIGINS"] &&
+  allowedOrigins.length > 0
+) {
+  logger.info(
+    `ALLOWED_ORIGINS not set - defaulting to ${allowedOrigins.join(", ")}. ` +
+      "Set ALLOWED_ORIGINS in your deployment to override.",
   );
 }
 
