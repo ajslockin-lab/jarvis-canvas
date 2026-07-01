@@ -104,7 +104,7 @@ export default defineConfig({
   },
   root: path.resolve(import.meta.dirname),
   build: {
-    outDir: path.resolve(import.meta.dirname, "dist/public"),
+    outDir: path.resolve(import.meta.dirname, "dist"),
     emptyOutDir: true,
     // External .js.map sidecars for every chunk. The browser fetches them
     // only when DevTools is open, so prod users pay nothing; we get
