@@ -13,6 +13,7 @@ import ForgotPasswordPage from "@/pages/ForgotPasswordPage";
 import ChatPage from "@/pages/ChatPage";
 import NotFound from "@/pages/not-found";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import RequireAuth from "@/components/auth/RequireAuth";
 
 const queryClient = new QueryClient();
 
@@ -23,13 +24,37 @@ function Router() {
       <Route path="/signin" component={SignInPage} />
       <Route path="/signup" component={SignUpPage} />
       <Route path="/verify-email" component={VerifyEmailPage} />
-      <Route path="/onboarding/canvas" component={OnboardingCanvasPage} />
       <Route path="/forgot-password" component={ForgotPasswordPage} />
-      <Route path="/dashboard" component={DashboardPage} />
-      <Route path="/settings" component={SettingsPage} />
-      <Route path="/chat" component={ChatPage} />
-      <Route path="/extension" component={ExtensionPage} />
-      <Route path="/extension/iframe" component={ExtensionIframePage} />
+      <Route path="/onboarding/canvas">
+        <RequireAuth>
+          <OnboardingCanvasPage />
+       </RequireAuth>
+     </Route>
+      <Route path="/dashboard">
+        <RequireAuth>
+          <DashboardPage />
+       </RequireAuth>
+     </Route>
+      <Route path="/settings">
+        <RequireAuth>
+          <SettingsPage />
+       </RequireAuth>
+     </Route>
+      <Route path="/chat">
+        <RequireAuth>
+          <ChatPage />
+       </RequireAuth>
+     </Route>
+      <Route path="/extension">
+        <RequireAuth>
+          <ExtensionPage />
+       </RequireAuth>
+     </Route>
+      <Route path="/extension/iframe">
+        <RequireAuth>
+          <ExtensionIframePage />
+       </RequireAuth>
+  </Route>
       <Route component={NotFound} />
 </Switch>
   );
@@ -41,13 +66,13 @@ function App() {
     // anywhere in the page tree gets caught and the global providers
     // stay mounted. Important: keep the boundary between providers
     // and the page tree at this level.
-    <ErrorBoundary>
+   <ErrorBoundary>
       <QueryClientProvider client={queryClient}>
         <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
           <Router />
-  </WouterRouter>
- </QueryClientProvider>
-</ErrorBoundary>
+   </WouterRouter>
+  </QueryClientProvider>
+ </ErrorBoundary>
   );
 }
 
