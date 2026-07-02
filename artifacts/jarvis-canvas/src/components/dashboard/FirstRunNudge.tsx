@@ -18,6 +18,7 @@
 
 import { X, ArrowRight, Sparkles } from "lucide-react";
 import { firstRunActivationStorageKey } from "@/lib/useFirstRunState";
+import { apiUrl } from "@/lib/api-base";
 
 export interface FirstRunNudgeProps {
   userId: string;
