@@ -79,7 +79,7 @@ if (process.env["NODE_ENV"] === "production") {
       referrerPolicy: { policy: "no-referrer" },
       crossOriginEmbedderPolicy: false, // unset — irrelevant for JSON API
       crossOriginOpenerPolicy: { policy: "same-origin" },
-      crossOriginResourcePolicy: { policy: "same-site" },
+      crossOriginResourcePolicy: { policy: "cross-origin" }, // API is on hf.space, frontend on vercel.app — different sites need cross-origin
     }),
   );
 } else {
