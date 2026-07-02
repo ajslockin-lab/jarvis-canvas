@@ -193,8 +193,15 @@ const NAV_TARGETS: Record<string, string[]> = {
 const RISKY_WORDS = ["submit", "turn in", "delete", "drop", "withdraw", "unenroll", "take quiz", "start quiz", "start exam", "purchase", "pay"];
 
 function normalize(text: string) { return text.toLowerCase().replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ").trim(); }
+// Collapse optional articles ("take a quiz" → "take quiz") so multi-word risky
+// patterns still match when the user says "a"/"the"/"my" between words.
+function squash(text: string) { return text.replace(/\b(a|an|the|my|to|for)\b/g, "").replace(/\s+/g, " ").trim(); }
 function elementLabel(el: PageElement) { return normalize([el.text, el.ariaLabel, el.placeholder, el.href, el.tag].filter(Boolean).join(" ")); }
-function isRisky(command: string) { const n = normalize(command); return RISKY_WORDS.some((w) => n.includes(w)); }
+function isRisky(command: string) {
+  const n = normalize(command);
+  const s = squash(n);
+  return RISKY_WORDS.some((w) => n.includes(w) || s.includes(squash(w)));
+}
 
 // Levenshtein distance — cheap enough for short sidebar labels.
 // Used to score element label quality vs. the user's command tokens.

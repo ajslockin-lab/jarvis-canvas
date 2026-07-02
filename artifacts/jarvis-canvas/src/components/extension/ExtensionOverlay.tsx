@@ -2,12 +2,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { Mic, X, Sparkles, Loader2, ChevronLeft, ChevronRight, Zap, MousePointer, ArrowDown, ArrowUp, Navigation, Eye, Cpu, Volume2, VolumeX } from "lucide-react";
 
 const SESSION_KEY = "jarvis_session_token";
-function readElement(elementId: string) {
-  postBridge({ type: "jarvis-read-element", elementId });
-}
-function readSelection() {
-  postBridge({ type: "jarvis-read-selection" });
-}
+
 // API_BASE is empty = relative URLs (same-origin). If API runs on a different domain,
 // set this to the API origin (e.g. "https://api.carvis.app") via env or config.
 const API_BASE = "";
@@ -122,6 +117,7 @@ export default function ExtensionOverlay() {
   }, []);
 
   const historyEndRef = useRef<HTMLDivElement>(null);
+  const recognitionRef = useRef<any>(null);
 
   useEffect(() => {
     const stored = localStorage.getItem(SESSION_KEY);
@@ -209,9 +205,6 @@ export default function ExtensionOverlay() {
       .catch(() => {});
   }, [authHeaders]);
 
-  useEffect(() => { fetchData(); }, [fetchData]);
-  useEffect(() => { if (sessionToken) fetchData(); }, [sessionToken]); // eslint-disable-line react-hooks/exhaustive-deps
-
   useEffect(() => {
     historyEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [agentHistory]);
@@ -261,11 +254,9 @@ export default function ExtensionOverlay() {
       const data: AgentPlan = await res.json();
       setAgentHistory((h) => [...h, { role: "jarvis", text: data.response, action: data.action, blocked: data.blocked }]);
       speak(data.response);
-      if (data.action && !data.blocked) executeAgentAction(data.action);
-      const actions = Array.isArray(data.action) ? data.action : (data.action ? [data.action] : []);
-      for (const a of actions) {
-        if (!a) continue;
-        executeAgentAction(a);
+      if (data.action && !data.blocked) {
+        const actions = Array.isArray(data.action) ? data.action : [data.action];
+        for (const a of actions) executeAgentAction(a as AgentAction);
       }
     } catch {
       const errMsg = "Connection error — CARVIS offline.";
@@ -277,16 +268,23 @@ export default function ExtensionOverlay() {
   }, [agentLoading, authHeaders, executeAgentAction, pageContext]);
 
   const toggleVoice = () => {
-    if (isListening) { setIsListening(false); return; }
+    if (isListening || recognitionRef.current) {
+      recognitionRef.current?.stop?.();
+      recognitionRef.current = null;
+      setIsListening(false);
+      return;
+    }
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const SpeechAPI = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (!SpeechAPI) { setAgentHistory((h) => [...h, { role: "jarvis", text: "Voice not supported in this browser." }]); return; }
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const rec = new SpeechAPI() as any;
+    recognitionRef.current = rec;
     rec.continuous = false;
     rec.interimResults = false;
     rec.onstart = () => setIsListening(true);
-    rec.onend = () => setIsListening(false);
+    rec.onend = () => { setIsListening(false); recognitionRef.current = null; };
+    rec.onerror = () => { setIsListening(false); recognitionRef.current = null; };
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     rec.onresult = (event: any) => {
       const t = event.results[0][0].transcript;
