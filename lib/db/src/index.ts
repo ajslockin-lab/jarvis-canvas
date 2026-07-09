@@ -23,7 +23,13 @@ function connectionString(): string {
   // `carvis_app` has its own role password set in the migration.
   try {
     const parsed = new URL(url);
-    if (parsed.username === "postgres") {
+    // Only rewrite `postgres` -> `carvis_app` for local dev DBs. Hosted
+    // Postgres (Supabase, Neon, Render, etc.) must use the URL the operator
+    // provisioned — silently swapping to user `carvis_app` would break
+    // auth against the real database role.
+    const isLocal =
+      parsed.hostname === "localhost" || parsed.hostname.startsWith("127.");
+    if (isLocal && parsed.username === "postgres") {
       parsed.username = "carvis_app";
       parsed.password = "carvis_app";
     }
