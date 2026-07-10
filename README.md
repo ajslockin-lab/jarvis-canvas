@@ -1,3 +1,12 @@
+---
+title: Carvis API
+emoji: 🧠
+colorFrom: indigo
+colorTo: blue
+sdk: docker
+app_port: 8080
+---
+
 # CARVIS — Canvas Intelligence
 
 > An AI-powered multi-surface assistant for Canvas LMS that lives in a web app, a Chrome extension, and a voice interface — all backed by one Express + Postgres backend.
