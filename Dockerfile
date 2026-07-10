@@ -39,7 +39,7 @@ COPY artifacts/api-server/package.json ./artifacts/api-server/
 COPY lib/db/package.json ./lib/db/
 COPY lib/api-zod/package.json ./lib/api-zod/
 COPY lib/api-spec/package.json ./lib/api-spec/
-COPY scripts/package.json ./scripts/ 2>/dev/null || true
+COPY scripts/package.json ./scripts/
 
 # pnpm fetched deps for the entire workspace; the build itself only
 # needs the api-server output.
