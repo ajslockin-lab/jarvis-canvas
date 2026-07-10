@@ -43,7 +43,7 @@ COPY scripts/package.json ./scripts/
 
 # pnpm fetched deps for the entire workspace; the build itself only
 # needs the api-server output.
-RUN pnpm install --frozen-lockfile --filter @workspace/api-server... --filter @workspace/db...
+RUN pnpm install --filter @workspace/api-server... --filter @workspace/db...
 
 # Now copy the source. From here on, cache invalidates when source changes.
 COPY tsconfig.base.json tsconfig.json ./
@@ -74,7 +74,7 @@ COPY lib/api-zod/package.json ./lib/api-zod/
 COPY lib/api-spec/package.json ./lib/api-spec/
 
 RUN corepack enable && corepack prepare pnpm@9.15.0 --activate && \
-    pnpm install --frozen-lockfile \
+    pnpm install \
       --filter @workspace/api-server... --filter @workspace/db... \
       --prod --ignore-scripts
 
