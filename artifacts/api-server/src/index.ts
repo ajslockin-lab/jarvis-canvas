@@ -4,7 +4,11 @@ import { pool } from "@workspace/db";
 import { startSyncScheduler, stopSyncScheduler } from "./lib/sync-scheduler.js";
 import { startReminderScheduler, stopReminderScheduler } from "./lib/reminder-scheduler.js";
 
-const rawPort = process.env["PORT"];
+// Default to 8080 when no PORT is set. Render/Fly/Railway all inject PORT,
+// but Hugging Face Spaces' Docker SDK uses app_port from the Space README
+// frontmatter for routing without always setting PORT — defaulting matches
+// app_port: 8080 in our README so the container binds there.
+const rawPort = process.env["PORT"] ?? "8080";
 
 if (!rawPort) {
   throw new Error(
