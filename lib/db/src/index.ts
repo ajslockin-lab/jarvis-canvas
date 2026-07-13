@@ -1,6 +1,14 @@
 import { drizzle } from "drizzle-orm/node-postgres";
 import pg from "pg";
+import { setDefaultResultOrder } from "node:dns";
 import * as schema from "./schema";
+
+// ponytail: Force IPv4-first DNS resolution so cloud hosts that can't route
+// IPv6 outbound (notably Hugging Face Spaces free tier) don't pick a dead
+// AAAA record for the DB host. Must run before `new Pool()` below — pg uses
+// node:net which honors this default for every new connection. Harmless on
+// IPv4-only or dual-stack hosts.
+setDefaultResultOrder("ipv4first");
 
 const { Pool } = pg;
 
