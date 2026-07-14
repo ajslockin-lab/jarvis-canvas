@@ -67,14 +67,11 @@ export default function SignUpPage() {
       });
 
       if (res.ok) {
-        const data = await res.json();
-        // Forward userId (and email) to the verify page. We deliberately
-        // ignore any devCode that the server might surface — that's only
-        // useful in dev and the verify page no longer shows it.
-        const params = new URLSearchParams();
-        params.set("userId", data.userId);
-        params.set("email", email.trim());
-        navigate(`/verify-email?${params.toString()}`);
+        // email-skip mode: the backend auto-verified the account and created
+        // our session (set-cookie) on signup, so go straight to the app
+        // instead of the now-email-less /verify-email screen. Drop the body
+        // parse — we don't need userId/devCode anymore.
+        navigate("/dashboard");
         return;
       }
 
