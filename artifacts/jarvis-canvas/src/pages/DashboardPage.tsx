@@ -301,6 +301,23 @@ export default function DashboardPage() {
           });
         } else {
           setAutoSyncTriggered(true);
+          // ponytail: no Canvas connected. The sync poller only advances
+          // phase to "done" when a sync actually runs, and a sync only runs
+          // when canvasBaseUrl is set — so for a user who never connected
+          // Canvas, syncPhase is stuck at "idle" forever. That left the
+          // entire dashboard hanging: fetchData() is never called on mount
+          // (only by the poller once phase hits "done"), so dataLoaded stayed
+          // false → isInitialLoad stayed true → the assignment/counter/intel
+          // skeletons rendered permanently, AND the FirstRunBanner showed its
+          // idle spinner ("Preparing your Canvas workspace… this takes 5–20s")
+          // which never resolves. The correct terminal UX here is the empty-
+          // state "CONNECT CANVAS IN SYSTEM SETTINGS" card, so fetch the
+          // (empty) user data to mark the dashboard loaded. showFirstRunBanner
+          // is also gated on canvasConnected !== false below for the same
+          // reason.
+          if (!data.canvasBaseUrl) {
+            void fetchData();
+          }
         }
       } catch {
         setAutoSyncTriggered(true);
@@ -376,8 +393,14 @@ export default function DashboardPage() {
   // sync is in flight (phase=courses/assignments/grades) is the failure
   // mode we're avoiding.
   const voiceButtonVisible = syncPhase === "done" && courses.length > 0;
-  // FirstRunBanner shows for everything except phase=done.
-  const showFirstRunBanner = syncPhase !== "done";
+  // FirstRunBanner shows for everything except phase=done — but ONLY when
+  // the user has connected Canvas. For a user with no Canvas connected the
+  // phase is permanently "idle" (sync never fires), so gating purely on
+  // phase !== "done" would leave the "Preparing your Canvas workspace…"
+  // spinner up forever. canvasConnected is null until the first sync-status
+  // poll resolves (brief banner flash during that window is fine), then
+  // false for the no-Canvas case (banner hidden, empty-state card shows).
+  const showFirstRunBanner = syncPhase !== "done" && canvasConnected !== false;
   // FirstRunNudge shows only when data is loaded, the user hasn't dismissed
   // it, and the first sync is complete.
   const showFirstRunNudge =
