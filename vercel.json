@@ -4,6 +4,7 @@
   "outputDirectory": "artifacts/jarvis-canvas/dist",
   "framework": "vite",
   "rewrites": [
+    { "source": "/api/:path*", "destination": "https://Ssatgk-carvis-api.hf.space/api/:path*" },
     { "source": "/(.*)", "destination": "/index.html" }
   ]
 }

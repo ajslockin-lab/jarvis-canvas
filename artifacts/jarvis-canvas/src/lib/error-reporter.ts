@@ -3,7 +3,10 @@
 // POSTs them to /api/errors so they show up in the server's pino logs.
 // This gives us visibility into browser crashes we'd otherwise never see.
 
-const API_BASE = import.meta.env.VITE_API_URL?.replace(/\/+$/, "") || "";
+// Same-origin ("/api/errors"); vercel.json proxies "/api/*" to the api-server
+// in prod and vite.config.ts proxies to localhost:8080 in dev. See api-base.ts
+// for why this must not be cross-origin (HF Spaces preflight / credentials).
+const API_BASE = "";
 
 async function reportError(payload: {
   message: string;
