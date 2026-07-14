@@ -17,14 +17,14 @@ export default function CanvasConnectButton({ connected }: CanvasConnectButtonPr
 
   return (
     <div className="space-y-3">
-      <Link href="/signin"
+      <Link href="/onboarding/canvas"
         className="hud-btn-primary hud-btn inline-flex items-center gap-2 px-5 py-2.5">
         <Link2 className="w-4 h-4" />
         <span>CONNECT WITH ACCESS TOKEN</span>
         <ArrowRight className="w-4 h-4" />
       </Link>
       <p className="font-rajdhani text-[11px] text-[#5a7a8a]">
-        Uses your Canvas Personal Access Token — no admin approval required.
+        Uses your Canvas Personal Access Token — no admin approval required. You can also sign in with Canvas OAuth on the next screen.
       </p>
     </div>
   );
