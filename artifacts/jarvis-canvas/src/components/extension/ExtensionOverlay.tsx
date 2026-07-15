@@ -27,6 +27,16 @@ interface Grade {
   letterGrade?: string | null;
 }
 
+// Payload the content script relays from Canvas's /api/v1/* (session-authed).
+// Shapes mirror the backend ingestSchema in routes/extension.ts.
+interface IngestPayload {
+  canvasBase: string;
+  self: { id: number; name?: string; email?: string };
+  courses: Record<string, unknown>[];
+  assignmentsByCourse: Record<string, Record<string, unknown>[]>;
+  enrollments: { course_id: number; current_score: number | null; final_score: number | null }[];
+}
+
 interface AgentAction {
   type: "click" | "fill" | "scroll" | "navigate";
   elementId?: string;
@@ -162,6 +172,12 @@ export default function ExtensionOverlay() {
           ...h,
           { role: "jarvis", text: sel ? `📝 selection: "${sel.slice(0, 220)}"` : "(no selection)" },
         ]);
+      } else if (e.data?.type === "carvis-ingest" && e.data?.payload && window.parent !== window) {
+        // Content script (running same-origin on the school's Canvas) pulled
+        // courses/assignments/grades using the user's logged-in session cookie
+        // — this is the no-PAT/no-OAuth connect path. Relay the JSON to the
+        // backend (same-origin here, so the jarvis_session cookie authorizes).
+        void ingest(e.data.payload as IngestPayload, e.source as Window, e.origin);
       }
     };
     window.addEventListener("message", handleMessage);
@@ -204,6 +220,37 @@ export default function ExtensionOverlay() {
       })
       .catch(() => {});
   }, [authHeaders]);
+
+  // Relay the content-script's Canvas pull to the backend, then refresh the
+  // overlay so the new courses/grades show up immediately.
+  const ingest = useCallback(async (payload: IngestPayload, source: Window | null, origin: string) => {
+    try {
+      const res = await fetch(`${API_BASE}/api/extension/ingest`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeaders() },
+        credentials: "include",
+        body: JSON.stringify(payload),
+      });
+      if (res.ok) {
+        fetchData();
+        source?.postMessage({ type: "carvis-ingest-result", ok: true }, origin);
+      } else {
+        source?.postMessage({ type: "carvis-ingest-result", ok: false, status: res.status }, origin);
+      }
+    } catch {
+      source?.postMessage({ type: "carvis-ingest-result", ok: false, status: 0 }, origin);
+    }
+  }, [authHeaders, fetchData]);
+
+  // When we're authed to carvis, ask the parent content script to pull Canvas
+  // data with the logged-in session cookie and relay it back via carvis-ingest.
+  // Fires on the false→true transition (covers both already-authed-on-open and
+  // just-signed-in-via-overlay). This is the no-PAT/no-OAuth connect trigger.
+  useEffect(() => {
+    if (!authed) return;
+    if (window.parent === window) return; // not in an iframe
+    window.parent.postMessage({ type: "carvis-run-sync" }, "*");
+  }, [authed]);
 
   useEffect(() => {
     historyEndRef.current?.scrollIntoView({ behavior: "smooth" });
