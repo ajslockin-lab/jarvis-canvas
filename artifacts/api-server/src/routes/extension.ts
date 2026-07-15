@@ -3,6 +3,10 @@ import { requireAuth } from "../lib/auth.js";
 import { z } from "zod";
 import { readFileSync } from "fs";
 import { join } from "path";
+import { db } from "@workspace/db";
+import { usersTable, coursesTable, assignmentsTable, gradesTable } from "@workspace/db/schema";
+import { and, eq } from "drizzle-orm";
+import { logger } from "../lib/logger.js";
 
 const router = Router();
 
@@ -327,6 +331,165 @@ router.post("/extension/agent", async (req, res) => {
   }
 
   res.json(planAction(parsed.data.command, parsed.data.pageContext));
+});
+
+// POST /extension/ingest — the content-script → carvis-iframe bridge pushes
+// Canvas data pulled with the user's *logged-in browser session*.
+//
+// Why this exists: some schools disable Personal Access Tokens (and OAuth) for
+// students, so the PAT/OAuth connect flow can't reach the Canvas REST API
+// server-side. But every student who can log into Canvas *in a browser* has a
+// valid session cookie — and Canvas's /api/v1/* endpoints accept that session.
+// The CARVIS content script runs same-origin on the school's Canvas, fetches
+// /api/v1/courses + assignments + enrollments-with-grades using the session
+// cookie, and relays the JSON here through the carvis iframe (same-origin with
+// the app, so the jarvis_session cookie authorizes the POST — no CORS/CSRF
+// gymnastics). We map it into the SAME tables the PAT sync writes, set the
+// user's canvasBaseUrl/canvasUserId, and flip lastSyncPhase to "done" so the
+// dashboard lights up identically to a PAT user.
+//
+// Mapping intentionally mirrors lib/sync-scheduler.ts (scopedCourseId /
+// scopedAssignmentId / letterGrade) so a user who later gets a PAT doesn't get
+// duplicate rows — the deterministic ids collide and upsert in place.
+const ingestSchema = z.object({
+  canvasBase: z.string().url(),
+  self: z.object({ id: z.number().int(), name: z.string().optional(), email: z.string().optional() }),
+  courses: z.array(z.record(z.string(), z.unknown())),
+  assignmentsByCourse: z.record(z.string(), z.array(z.record(z.string(), z.unknown()))),
+  enrollments: z.array(z.object({
+    course_id: z.number().int(),
+    current_score: z.number().nullable().optional(),
+    final_score: z.number().nullable().optional(),
+  })),
+});
+
+function scopedCourseId(userId: string, canvasCourseId: string) {
+  return `${userId}__c${canvasCourseId}`;
+}
+function scopedAssignmentId(scopedCourse: string, canvasAssignmentId: string) {
+  return `${scopedCourse}__a${canvasAssignmentId}`;
+}
+function letterGrade(score: number | null): string | null {
+  if (score === null || score === undefined) return null;
+  if (score >= 90) return "A";
+  if (score >= 80) return "B";
+  if (score >= 70) return "C";
+  if (score >= 60) return "D";
+  return "F";
+}
+
+router.post("/extension/ingest", async (req, res) => {
+  const user = await requireAuth(req, res);
+  if (!user) return;
+
+  const parsed = ingestSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "Invalid ingest payload", code: "bad_request" });
+    return;
+  }
+  const { canvasBase, self, courses, assignmentsByCourse, enrollments } = parsed.data;
+  const canvasBaseNorm = canvasBase.replace(/\/+$/, "");
+  const userId = user.id;
+
+  try {
+    // Connect the user to their Canvas (idempotent — re-ingest just refreshes).
+    // canvasUserId lets a future PAT-backed fill use the same enrollments route.
+    await db.update(usersTable).set({
+      canvasBaseUrl: canvasBaseNorm,
+      canvasUserId: String(self.id),
+      lastSyncPhase: "courses",
+      lastSyncAt: new Date(),
+      updatedAt: new Date(),
+    }).where(eq(usersTable.id, userId));
+
+    // ── Courses ── (mirror sync-scheduler: keep workflow_state==="available")
+    for (const c of courses) {
+      const id = c["id"];
+      if (id === undefined || id === null) continue;
+      if (c["workflow_state"] !== undefined && c["workflow_state"] !== "available") continue;
+      const courseId = scopedCourseId(userId, String(id));
+      const courseData = {
+        userId,
+        name: String(c["name"] ?? "Untitled Course"),
+        code: c["course_code"] ? String(c["course_code"]) : null,
+        color: c["course_color"] ? String(c["course_color"]) : null,
+        lastSynced: new Date(),
+      };
+      try {
+        await db.insert(coursesTable).values({ id: courseId, ...courseData });
+      } catch {
+        await db.update(coursesTable).set(courseData).where(eq(coursesTable.id, courseId));
+      }
+    }
+
+    // ── Assignments ──
+    await db.update(usersTable).set({ lastSyncPhase: "assignments", updatedAt: new Date() }).where(eq(usersTable.id, userId));
+    for (const [canvasCourseId, rawAssignments] of Object.entries(assignmentsByCourse)) {
+      const scopedCourse = scopedCourseId(userId, canvasCourseId);
+      for (const a of rawAssignments) {
+        const aid = a["id"];
+        if (aid === undefined || aid === null) continue;
+        const assignmentId = scopedAssignmentId(scopedCourse, String(aid));
+        const assignmentData = {
+          courseId: scopedCourse,
+          name: String(a["name"] ?? "Untitled Assignment"),
+          description: a["description"] ? String(a["description"]) : null,
+          dueDate: a["due_at"] ? new Date(String(a["due_at"])) : null,
+          points: a["points_possible"] != null ? Number(a["points_possible"]) : null,
+          url: a["html_url"] ? String(a["html_url"]) : null,
+          updatedAt: new Date(),
+        };
+        try {
+          await db.insert(assignmentsTable).values({ id: assignmentId, ...assignmentData, completed: false });
+        } catch {
+          await db.update(assignmentsTable).set(assignmentData).where(eq(assignmentsTable.id, assignmentId));
+        }
+      }
+    }
+
+    // ── Grades ──
+    await db.update(usersTable).set({ lastSyncPhase: "grades", updatedAt: new Date() }).where(eq(usersTable.id, userId));
+    for (const e of enrollments) {
+      const scopedCourse = scopedCourseId(userId, String(e.course_id));
+      const current = e.current_score ?? null;
+      const gradeData = {
+        userId,
+        courseId: scopedCourse,
+        currentScore: current,
+        finalScore: e.final_score ?? null,
+        letterGrade: letterGrade(current),
+        fetchedAt: new Date(),
+      };
+      try {
+        await db.insert(gradesTable).values(gradeData);
+      } catch {
+        const [existing] = await db.select({ id: gradesTable.id }).from(gradesTable)
+          .where(and(eq(gradesTable.userId, userId), eq(gradesTable.courseId, scopedCourse)))
+          .limit(1);
+        if (existing) await db.update(gradesTable).set(gradeData).where(eq(gradesTable.id, existing.id));
+      }
+    }
+
+    // ── Done ── (no calendar-sync here: that needs a PAT/feed token the
+    // session-pull user doesn't have. Assignments already cover proactive UX.)
+    await db.update(usersTable).set({
+      lastSyncPhase: "done",
+      lastSyncError: null,
+      lastSyncAt: new Date(),
+      updatedAt: new Date(),
+    }).where(eq(usersTable.id, userId));
+
+    logger.info({ userId, courses: courses.length, enrollments: enrollments.length }, "extension ingest done");
+    res.json({ success: true, courseCount: courses.length });
+  } catch (err) {
+    logger.error({ userId, err }, "extension ingest failed");
+    await db.update(usersTable).set({
+      lastSyncPhase: "error",
+      lastSyncError: err instanceof Error ? err.message : "ingest failed",
+      updatedAt: new Date(),
+    }).where(eq(usersTable.id, userId));
+    res.status(500).json({ error: "Something went wrong on our end", code: "server_error" });
+  }
 });
 
 export default router;

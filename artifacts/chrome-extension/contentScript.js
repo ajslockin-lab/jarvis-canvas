@@ -14,6 +14,8 @@
   let observer = null;
   let moTimer = null;
   let appOrigin = DEFAULT_APP_URL;
+  let syncing = false;       // guards concurrent Canvas pulls
+  let lastSyncAt = 0;        // throttle (ms epoch) — once per 5 min
 
   function getAppUrl(cb) {
     if (typeof chrome !== "undefined" && chrome.storage?.sync) {
@@ -63,8 +65,8 @@
       "nav a",
       "#global_nav a",
       ".ic-app-header__main-navigation a",
-      "[role="tab"]",
-      "[role="treeitem"]",
+      '[role="tab"]',
+      '[role="treeitem"]',
       "[aria-expanded]",
       "[aria-controls]",
       "[data-module-id]",
@@ -224,6 +226,98 @@
 
     if (data.type === "jarvis-close") {
       closeOverlay();
+    }
+
+    // Overlay (authed to carvis) asking us to pull Canvas with the session
+    // cookie and relay it back as carvis-ingest. The actual Canvas fetch MUST
+    // happen here (same-origin with Canvas) — the iframe can't reach Canvas.
+    if (data.type === "carvis-run-sync") {
+      syncCanvasData();
+      return;
+    }
+  }
+
+  // Pull Canvas data using the user's logged-in browser session (same-origin,
+  // credentials: include → session cookie). No PAT / OAuth / admin action
+  // needed — this is the universal connect path for schools that disable them.
+  // The fetches run same-origin on the school's Canvas, so there's no CORS.
+  // We hand the JSON to the carvis iframe (same-origin with the app) which
+  // relays it to /api/extension/ingest (cookie-authed).
+  async function syncCanvasData() {
+    if (!overlay || !overlay.contentWindow) return; // nowhere to relay
+    if (syncing) return;
+    const now = Date.now();
+    if (now - lastSyncAt < 5 * 60 * 1000) return; // throttle
+    syncing = true;
+    lastSyncAt = now;
+
+    const canvasBase = window.location.origin;
+    const cred = { credentials: "include", headers: { Accept: "application/json" } };
+
+    try {
+      // 1. Who am I? (canvas user id → enrollments route)
+      const selfRes = await fetch(`${canvasBase}/api/v1/users/self`, cred);
+      if (!selfRes.ok) throw new Error(`users/self ${selfRes.status}`);
+      const self = await selfRes.json();
+
+      // 2. Courses (same filter as PAT sync: workflow_state === "available")
+      const coursesRes = await fetch(`${canvasBase}/api/v1/courses?per_page=100`, cred);
+      if (!coursesRes.ok) throw new Error(`courses ${coursesRes.status}`);
+      const allCourses = await coursesRes.json();
+      const courses = (allCourses || []).filter(
+        (c) => c && c.id != null && (c.workflow_state === undefined || c.workflow_state === "available")
+      );
+
+      // 3. Assignments per course (parallel; restricted courses 401 → skip).
+      // Map to essentials: keeps the relay payload small (carvis's JSON body
+      // limit is 100kb) and drops noisy course-authored HTML we don't render.
+      const assignmentsByCourse = {};
+      await Promise.all(
+        courses.map(async (c) => {
+          try {
+            const r = await fetch(`${canvasBase}/api/v1/courses/${c.id}/assignments?include[]=submission&per_page=100`, cred);
+            if (!r.ok) return;
+            const list = await r.json();
+            if (Array.isArray(list)) {
+              assignmentsByCourse[String(c.id)] = list.map((a) => ({
+                id: a.id,
+                name: a.name,
+                due_at: a.due_at,
+                points_possible: a.points_possible,
+                html_url: a.html_url,
+              }));
+            }
+          } catch { /* restricted/locked course — skip */ }
+        })
+      );
+
+      // 4. Grades via self enrollments (include[]=grades)
+      let enrollments = [];
+      try {
+        const eRes = await fetch(`${canvasBase}/api/v1/users/${self.id}/enrollments?include[]=grades&per_page=100&type[]=StudentEnrollment`, cred);
+        if (eRes.ok) enrollments = await eRes.json();
+      } catch { /* grades optional */ }
+      enrollments = (enrollments || []).map((e) => ({
+        course_id: e.course_id,
+        current_score: e.grades?.current_score ?? null,
+        final_score: e.grades?.final_score ?? null,
+      }));
+
+      overlay.contentWindow.postMessage(
+        { type: "carvis-ingest", payload: { canvasBase, self, courses, assignmentsByCourse, enrollments } },
+        appOrigin
+      );
+    } catch (err) {
+      // Not logged into Canvas, or session expired — tell the overlay so it can
+      // surface a hint instead of silently failing.
+      try {
+        overlay.contentWindow.postMessage(
+          { type: "carvis-ingest-error", reason: err && err.message ? err.message : String(err) },
+          appOrigin
+        );
+      } catch { /* overlay gone */ }
+    } finally {
+      syncing = false;
     }
   }
 
