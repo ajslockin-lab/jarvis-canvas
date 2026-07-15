@@ -16,6 +16,14 @@
   let appOrigin = DEFAULT_APP_URL;
   let syncing = false;       // guards concurrent Canvas pulls
   let lastSyncAt = 0;        // throttle (ms epoch) — once per 5 min
+  // Hidden background relay iframe: keeps data fresh whenever the student is
+  // on Canvas, WITHOUT opening the visible overlay. Mounted on page load
+  // (throttled), torn down once a sync round-trips (carvis-ingest-result) or a
+  // safety timeout fires. Distinct from the visible `overlay` the bubble opens.
+  let relay = null;
+  let relayKillTimer = null;
+  const RELAY_LIFETIME_MS = 45000;         // hard cap before tearing down the relay
+  const BG_INTERVAL_MS = 30 * 60 * 1000;  // background sync at most every 30 min
 
   function getAppUrl(cb) {
     if (typeof chrome !== "undefined" && chrome.storage?.sync) {
@@ -169,6 +177,12 @@
     }
   }
 
+  // A message is from carvis if it came from the visible overlay OR the hidden
+  // background relay (both load /extension/iframe from appOrigin).
+  function isCarvisFrame(win) {
+    return !!win && (win === overlay?.contentWindow || win === relay?.contentWindow);
+  }
+
   function sendContext(source, origin) {
     source.postMessage(
       {
@@ -182,7 +196,7 @@
   }
 
   function handleMessage(event) {
-    if (!overlay || event.source !== overlay.contentWindow) return;
+    if (!isCarvisFrame(event.source)) return;
     if (!isAllowedOrigin(event.origin)) return;
 
     const data = event.data || {};
@@ -232,7 +246,15 @@
     // cookie and relay it back as carvis-ingest. The actual Canvas fetch MUST
     // happen here (same-origin with Canvas) — the iframe can't reach Canvas.
     if (data.type === "carvis-run-sync") {
-      syncCanvasData();
+      syncCanvasData(event.source);
+      return;
+    }
+
+    // The iframe (overlay or background relay) finished relaying our Canvas
+    // pull to the backend. If this came from the background relay, its job is
+    // done — tear it down so the hidden iframe doesn't linger.
+    if (data.type === "carvis-ingest-result") {
+      if (event.source === relay?.contentWindow) teardownBackgroundRelay(!!data.ok);
       return;
     }
   }
@@ -243,8 +265,9 @@
   // The fetches run same-origin on the school's Canvas, so there's no CORS.
   // We hand the JSON to the carvis iframe (same-origin with the app) which
   // relays it to /api/extension/ingest (cookie-authed).
-  async function syncCanvasData() {
-    if (!overlay || !overlay.contentWindow) return; // nowhere to relay
+  async function syncCanvasData(replyFrame) {
+    const target = replyFrame || overlay?.contentWindow || relay?.contentWindow;
+    if (!target) return; // nowhere to relay
     if (syncing) return;
     const now = Date.now();
     if (now - lastSyncAt < 5 * 60 * 1000) return; // throttle
@@ -303,7 +326,7 @@
         final_score: e.grades?.final_score ?? null,
       }));
 
-      overlay.contentWindow.postMessage(
+      target.postMessage(
         { type: "carvis-ingest", payload: { canvasBase, self, courses, assignmentsByCourse, enrollments } },
         appOrigin
       );
@@ -311,11 +334,11 @@
       // Not logged into Canvas, or session expired — tell the overlay so it can
       // surface a hint instead of silently failing.
       try {
-        overlay.contentWindow.postMessage(
+        target.postMessage(
           { type: "carvis-ingest-error", reason: err && err.message ? err.message : String(err) },
           appOrigin
         );
-      } catch { /* overlay gone */ }
+      } catch { /* frame gone */ }
     } finally {
       syncing = false;
     }
@@ -358,7 +381,8 @@
       const bubble = document.getElementById(BUBBLE_ID);
       if (bubble) bubble.style.display = "none";
 
-      window.addEventListener("message", handleMessage);
+      // handleMessage is registered once for the page lifetime (below), so it
+      // also services the hidden background relay — no per-frame listener.
     };
 
     if (typeof chrome !== "undefined" && chrome.storage?.local) {
@@ -377,7 +401,6 @@
     if (!overlay) return;
     overlay.remove();
     overlay = null;
-    window.removeEventListener("message", handleMessage);
 
     const bubble = document.getElementById(BUBBLE_ID);
     if (bubble) bubble.style.display = "flex";
@@ -387,6 +410,52 @@
   function toggleOverlay() {
     if (overlay) closeOverlay();
     else openOverlay();
+  }
+
+  // Background relay: a hidden /extension/iframe. It boots the same overlay JS,
+  // which (if the student is signed into carvis → cookie auth) fires
+  // carvis-run-sync back here; we then pull Canvas with the session cookie and
+  // relay the JSON to the relay iframe, which POSTs it to the backend
+  // (same-origin with the app → no CORS). Tearing down on completion keeps the
+  // hidden iframe from lingering. Throttled in chrome.storage so navigating
+  // between Canvas pages doesn't fire it constantly.
+  function mountBackgroundRelay(sessionToken) {
+    if (relay) return; // already mounted this page
+    if (typeof chrome !== "undefined" && chrome.storage?.local) {
+      chrome.storage.local.get(["lastBgSync"], (r) => {
+        const last = r.lastBgSync || 0;
+        if (Date.now() - last < BG_INTERVAL_MS) return; // too soon since last background sync
+        mountRelayFrame(sessionToken);
+      });
+    } else {
+      mountRelayFrame(sessionToken);
+    }
+  }
+
+  function mountRelayFrame(sessionToken) {
+    relay = document.createElement("iframe");
+    relay.id = "carvis-relay";
+    const qs = sessionToken ? `?session_token=${encodeURIComponent(sessionToken)}` : "";
+    relay.src = `${appOrigin}/extension/iframe${qs}`;
+    // 1x1, off-screen, inert: present solely to run the relay JS.
+    relay.style.cssText = "position:fixed;width:1px;height:1px;left:-99px;top:-99px;border:0;opacity:0;pointer-events:none;";
+    relay.setAttribute("tabindex", "-1");
+    relay.setAttribute("aria-hidden", "true");
+    relay.setAttribute("title", "carvis background sync");
+    document.body.appendChild(relay);
+    relayKillTimer = setTimeout(() => teardownBackgroundRelay(false), RELAY_LIFETIME_MS);
+  }
+
+  function teardownBackgroundRelay(synced) {
+    if (relayKillTimer) { clearTimeout(relayKillTimer); relayKillTimer = null; }
+    if (!relay) return;
+    relay.remove();
+    relay = null;
+    // Only stamp the throttle on a real refresh so a failed/401 relay retries
+    // quickly next page visit (student may just not be signed in yet).
+    if (synced && typeof chrome !== "undefined" && chrome.storage?.local) {
+      chrome.storage.local.set({ lastBgSync: Date.now() });
+    }
   }
 
   // Floating bubble
@@ -403,7 +472,20 @@
     if (e.key === "Escape" && overlay) closeOverlay();
   });
 
+  // One page-lifetime listener services EVERY carvis frame (visible overlay +
+  // hidden background relay). Registered after all handlers are defined.
+  window.addEventListener("message", handleMessage);
+
   getAppUrl((url) => {
     appOrigin = url;
+    // Best-effort background sync: students visit Canvas daily during the
+    // school year, so this keeps their data fresh with zero interaction. No-op
+    // if they aren't signed into carvis yet (the relay 401s and tears down),
+    // and throttled so it doesn't run on every page navigation.
+    if (typeof chrome !== "undefined" && chrome.storage?.local) {
+      chrome.storage.local.get(["sessionToken"], (r) => mountBackgroundRelay(r.sessionToken || null));
+    } else {
+      mountBackgroundRelay(null);
+    }
   });
 })();
