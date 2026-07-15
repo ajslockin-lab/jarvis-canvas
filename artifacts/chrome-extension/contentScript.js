@@ -4,7 +4,7 @@
 
   const BUBBLE_ID = "carvis-bubble";
   const OVERLAY_ID = "carvis-overlay";
-  const DEFAULT_APP_URL = "https://carvis.app";
+  const DEFAULT_APP_URL = "https://carvis.vercel.app";
   const ELEMENT_ATTR = "data-carvis-id";
   const MAX_ELEMENTS = 250;
 

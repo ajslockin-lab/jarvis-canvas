@@ -5,13 +5,13 @@
   "short_name": "CARVIS",
   "author": "Carvis",
   "description": "AI assistant for Canvas LMS — deadlines, grades, voice commands, and page control right inside your school's Canvas.",
-  "homepage_url": "https://carvis.app",
+  "homepage_url": "https://carvis.vercel.app",
   "permissions": [
     "storage",
     "activeTab"
   ],
   "host_permissions": [
-    "https://carvis.app/extension/iframe*"
+    "https://carvis.vercel.app/extension/iframe*"
   ],
   "action": {
     "default_icon": {
