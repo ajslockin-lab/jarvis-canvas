@@ -9,6 +9,8 @@ import DashboardPage from "@/pages/DashboardPage";
 import SettingsPage from "@/pages/SettingsPage";
 import ExtensionPage from "@/pages/ExtensionPage";
 import ExtensionIframePage from "@/pages/ExtensionIframePage";
+import MobileAppPage from "@/pages/MobileAppPage";
+import MacbookPage from "@/pages/MacbookPage";
 import ForgotPasswordPage from "@/pages/ForgotPasswordPage";
 import ChatPage from "@/pages/ChatPage";
 import NotFound from "@/pages/not-found";
@@ -55,6 +57,8 @@ function Router() {
           <ExtensionIframePage />
        </RequireAuth>
   </Route>
+      <Route path="/mobile" component={MobileAppPage} />
+      <Route path="/macos" component={MacbookPage} />
       <Route component={NotFound} />
 </Switch>
   );
