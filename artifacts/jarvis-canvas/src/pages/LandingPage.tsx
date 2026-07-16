@@ -107,14 +107,13 @@ export default function LandingPage() {
         <div className="relative z-10 max-w-4xl mx-auto text-center">
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[#FF4444]/10 border border-[#FF4444]/20 text-[#FF4444] text-sm font-medium mb-8">
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-            Actively Building — Join the Beta
+            Canvas · AI copilot · open beta
          </div>
-          <h1 className="text-5xl md:text-7xl font-extrabold tracking-tight mb-6 leading-[1.1]">
-            Meet <span className="text-[#FF4444]">CARVIS</span>.<br />
-            Your AI That Actually<br />Understands Canvas.
+          <h1 className="text-5xl md:text-7xl font-extrabold tracking-tight mb-6 leading-[1.05]">
+            Stop opening Canvas<br />in a <span className="text-[#FF4444]">panic</span>.
          </h1>
           <p className="text-lg md:text-xl text-slate-400 max-w-2xl mx-auto mb-10 leading-relaxed">
-            Stop drowning in assignments. CARVIS connects directly to your Canvas, tracks every deadline, reads your modules, and explains anything — all with a voice assistant that feels like talking to a tutor who actually cares.
+            Carvis syncs your classes in the background and turns <span className="text-white font-medium">47 due dates</span>, <span className="text-white font-medium">6 unread announcements</span>, and <span className="text-white font-medium">a grade you're afraid to check</span> into one calm thing: <span className="text-white font-medium">what to do next</span>.
          </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center mb-16">
             <Link href="/signin" className="inline-flex items-center justify-center gap-2 px-8 py-4 rounded-xl bg-white text-black font-semibold text-lg hover:bg-slate-200 transition shadow-lg shadow-white/10">
