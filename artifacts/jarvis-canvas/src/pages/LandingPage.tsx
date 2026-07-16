@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import { Sparkles, ArrowRight, Zap, Calendar, BookOpen, Mic, Check } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { usePWAInstall } from "@/hooks/use-pwa-install";
-import { useIsMobile } from "@/hooks/use-mobile";
 import CinematicDemo from "@/components/CinematicDemo";
 
 export default function LandingPage() {
@@ -10,18 +9,22 @@ export default function LandingPage() {
   const [menuOpen, setMenuOpen] = useState(false);
   const { isInstallable, isInstalled, promptInstall } = usePWAInstall();
   const [, navigate] = useLocation();
-  const isMobile = useIsMobile();
-
   useEffect(() => {
     if (typeof window === "undefined") return;
     const isStandalone =
       window.matchMedia("(display-mode: standalone)").matches ||
       (navigator as unknown as { standalone?: boolean }).standalone === true;
 
-    if (isStandalone || isMobile) {
+    // Standalone PWA launches (installed app opened from home screen) skip
+    // the marketing landing and go straight to the app. Mobile browsers are
+    // intentionally NOT redirected: the landing is responsive (it has a mobile
+    // hamburger nav) and bouncing every mobile visitor to /signup prevented
+    // them from reaching /mobile, /macos, or any nav link. Let mobile browsers
+    // see the landing and use the nav.
+    if (isStandalone) {
       navigate("/signup", { replace: true });
     }
-  }, [isMobile, navigate]);
+  }, [navigate]);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 50);
