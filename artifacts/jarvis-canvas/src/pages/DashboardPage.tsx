@@ -35,6 +35,8 @@ import {
   TrendingUp,
   AlertTriangle,
   LogOut,
+  Puzzle,
+  Download,
 } from "lucide-react";
 import VoiceInterface from "@/components/voice/VoiceInterface";
 import AssignmentCard from "@/components/dashboard/AssignmentCard";
@@ -597,21 +599,46 @@ export default function DashboardPage() {
               // settings CTA, the latter a softer empty message.
               <div className="hud-panel p-8 text-center">
                 <span className="corner-br" />
-                <BookOpen className="w-6 h-6 text-[rgba(245,245,245,0.35)] mx-auto mb-3" />
-                <p className="font-orbitron text-sm text-[rgba(245,245,245,0.35)]">NO TARGETS DETECTED</p>
                 {canvasConnected === false ? (
                   <>
-                    <p className="font-mono-data text-[11px] text-[rgba(245,245,245,0.35)] mt-1">CONNECT CANVAS IN SYSTEM SETTINGS</p>
-                    <Link
-                      href="/settings"
-                      className="mt-4 hud-btn inline-flex items-center gap-2 px-4 py-2"
-                    >
-                      <Settings className="w-3.5 h-3.5" />
-                      <span className="font-orbitron text-[11px] tracking-[0.15em]">OPEN SETTINGS</span>
-                    </Link>
+                    <Puzzle className="w-7 h-7 text-[#FF4444] mx-auto mb-3" />
+                    <p className="font-orbitron text-sm text-[#f5f5f5]">CONNECT CANVAS</p>
+                    <p className="font-mono-data text-[11px] text-[rgba(245,245,245,0.45)] mt-1">SYNC YOUR COURSES, ASSIGNMENTS AND GRADES</p>
+                    <p className="font-rajdhani text-[13px] text-[rgba(245,245,245,0.55)] mt-3 max-w-md mx-auto leading-relaxed">
+                      Two ways to connect. If your school allows <span className="text-white">Canvas access tokens</span>, add one in Settings. If your school disabled tokens (common in K-12), install the <span className="text-white">Chrome extension</span> — it syncs with the Canvas you're already logged into. No admin needed.
+                    </p>
+                    <div className="mt-5 flex flex-col sm:flex-row gap-3 justify-center">
+                      <a
+                        href="/api/extension/download"
+                        download
+                        className="hud-btn inline-flex items-center justify-center gap-2 px-5 py-2.5"
+                      >
+                        <Download className="w-4 h-4" />
+                        <span className="font-orbitron text-[11px] tracking-[0.15em]">DOWNLOAD EXTENSION</span>
+                      </a>
+                      <Link
+                        href="/extension"
+                        className="hud-btn inline-flex items-center justify-center gap-2 px-5 py-2.5"
+                      >
+                        <Puzzle className="w-3.5 h-3.5" />
+                        <span className="font-orbitron text-[11px] tracking-[0.15em]">INSTALL GUIDE</span>
+                      </Link>
+                      <Link
+                        href="/settings"
+                        className="hud-gear inline-flex items-center justify-center gap-2 px-5 py-2.5 border border-[rgba(160,21,21,0.4)] text-[rgba(245,245,245,0.6)] hover:text-[#FF4444] hover:border-[#FF4444]/40 transition-all rounded-lg"
+                      >
+                        <Settings className="w-3.5 h-3.5" />
+                        <span className="font-orbitron text-[11px] tracking-[0.15em]">OPEN SETTINGS</span>
+                      </Link>
+                    </div>
+                    <p className="font-mono-data text-[10px] text-[rgba(245,245,245,0.3)] mt-4">FREE · ~15KB · 5-STEP INSTALL · WORKS WITHOUT A TOKEN</p>
                   </>
                 ) : (
-                  <p className="font-mono-data text-[11px] text-[rgba(245,245,245,0.35)] mt-1">YOU'RE ALL CAUGHT UP — NICE WORK</p>
+                  <>
+                    <BookOpen className="w-6 h-6 text-[rgba(245,245,245,0.35)] mx-auto mb-3" />
+                    <p className="font-orbitron text-sm text-[rgba(245,245,245,0.35)]">NO TARGETS DETECTED</p>
+                    <p className="font-mono-data text-[11px] text-[rgba(245,245,245,0.35)] mt-1">YOU'RE ALL CAUGHT UP — NICE WORK</p>
+                  </>
                 )}
               </div>
             )}

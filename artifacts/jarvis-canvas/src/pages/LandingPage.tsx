@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Sparkles, ArrowRight, Zap, Calendar, BookOpen, Mic, Check, Puzzle } from "lucide-react";
+import { Sparkles, ArrowRight, Zap, Calendar, BookOpen, Mic, Check } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { usePWAInstall } from "@/hooks/use-pwa-install";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -54,7 +54,6 @@ export default function LandingPage() {
           <a href="#demo" className="text-sm text-slate-400 hover:text-white transition">Demo</a>
           <a href="#features" className="text-sm text-slate-400 hover:text-white transition">Features</a>
           <a href="#how-it-works" className="text-sm text-slate-400 hover:text-white transition">How It Works</a>
-          <Link href="/extension" className="text-sm text-slate-400 hover:text-white transition">Extension</Link>
           <Link href="/mobile" className="text-sm text-slate-400 hover:text-white transition">Mobile App</Link>
           <Link href="/macos" className="text-sm text-slate-400 hover:text-white transition">MacBook</Link>
           <button
@@ -86,7 +85,6 @@ export default function LandingPage() {
             <a href="#demo" onClick={() => setMenuOpen(false)} className="text-xl text-slate-300 hover:text-white transition">Demo</a>
             <a href="#features" onClick={() => setMenuOpen(false)} className="text-xl text-slate-300 hover:text-white transition">Features</a>
             <a href="#how-it-works" onClick={() => setMenuOpen(false)} className="text-xl text-slate-300 hover:text-white transition">How It Works</a>
-            <Link href="/extension" onClick={() => setMenuOpen(false)} className="text-xl text-slate-300 hover:text-white transition">Chrome Extension</Link>
             <Link href="/mobile" onClick={() => setMenuOpen(false)} className="text-xl text-slate-300 hover:text-white transition">Mobile App</Link>
             <Link href="/macos" onClick={() => setMenuOpen(false)} className="text-xl text-slate-300 hover:text-white transition">MacBook</Link>
             <button
@@ -207,9 +205,6 @@ export default function LandingPage() {
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Link href="/signin" className="inline-flex items-center justify-center gap-2 px-10 py-5 rounded-xl bg-white text-black font-semibold text-lg hover:bg-slate-200 transition shadow-lg shadow-white/10">
               Get Started Free <ArrowRight className="w-5 h-5" />
-            </Link>
-            <Link href="/extension" className="inline-flex items-center justify-center gap-2 px-8 py-5 rounded-xl bg-white/5 text-white font-semibold text-lg border border-white/10 hover:bg-white/10 transition">
-              <Puzzle className="w-5 h-5" /> Get Chrome Extension
             </Link>
           </div>
           <div className="mt-6 text-sm text-slate-500">
